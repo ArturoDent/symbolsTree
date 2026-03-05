@@ -1,106 +1,223 @@
 import * as vscode from 'vscode';
+import { buildNodeTree, collectSymbolItemsFromSource } from './nodeList';
+import * as Globals from './myGlobals';
+import { BoundedCache } from './mapCache';
+import type { NodeTreeItem, SymbolNode } from './types';
 
+type SymbolSource = 'vscode' | 'tsc';
 
-import type * as TS from "typescript";
+type EditorSymbolCache = {
+  documentVersion: number;
+  source: SymbolSource;
+  symbols: SymbolNode[];
+};
 
+type SelectionCycleState = {
+  uri: string;
+  documentVersion: number;
+  chainKey: string;
+  chain: SymbolNode[];
+  currentIndex: number;
+  selection: vscode.Selection;
+};
 
-// TS Usage:
-// const offset = sourceFile.getPositionOfLineAndCharacter(line, column);
-// const node = findNodeAtPosition(sourceFile, offset);
-// TODO: does 'node' have the range info so no need to do below:
-// const checker = program.getTypeChecker();
-// const symbol = checker.getSymbolAtLocation(node);
+const cache = new BoundedCache<vscode.Uri, EditorSymbolCache>( 3 );
+let cycleState: SelectionCycleState | undefined;
 
-export function findNodeAtPosition( node: TS.Node, pos: number ): TS.Node | undefined {
-  if ( pos < node.getStart() || pos > node.getEnd() ) {
-    return undefined;
-  }
-
-  for ( const child of node.getChildren() ) {
-    const found = findNodeAtPosition( child, pos );
-    if ( found ) return found;
-  }
-
-  return node; // deepest containing node
+function selectionEquals( a: vscode.Selection, b: vscode.Selection ): boolean {
+  return a.anchor.isEqual( b.anchor ) && a.active.isEqual( b.active );
 }
 
+function makeChainKey( chain: SymbolNode[] ): string {
+  return chain
+    .map( s => `${s.name}|${s.range.start.line}:${s.range.start.character}-${s.range.end.line}:${s.range.end.character}` )
+    .join( '>' );
+}
 
-// VSCode DocumentSymbol Usage:
-// const pos = new vscode.Position(line, column);
-// const symbol = findSymbolAtPosition(symbols, pos);
+function nameToKind( name: string ): vscode.SymbolKind {
+  switch ( name ) {
+    case 'file': return vscode.SymbolKind.File;
+    case 'module': return vscode.SymbolKind.Module;
+    case 'namespace': return vscode.SymbolKind.Namespace;
+    case 'package': return vscode.SymbolKind.Package;
+    case 'class': return vscode.SymbolKind.Class;
+    case 'method': return vscode.SymbolKind.Method;
+    case 'property': return vscode.SymbolKind.Property;
+    case 'field': return vscode.SymbolKind.Field;
+    case 'constructor': return vscode.SymbolKind.Constructor;
+    case 'enum': return vscode.SymbolKind.Enum;
+    case 'interface': return vscode.SymbolKind.Interface;
+    case 'function': return vscode.SymbolKind.Function;
+    case 'variable': return vscode.SymbolKind.Variable;
+    case 'constant': return vscode.SymbolKind.Constant;
+    case 'string': return vscode.SymbolKind.String;
+    case 'number': return vscode.SymbolKind.Number;
+    case 'boolean': return vscode.SymbolKind.Boolean;
+    case 'array': return vscode.SymbolKind.Array;
+    case 'object': return vscode.SymbolKind.Object;
+    case 'key': return vscode.SymbolKind.Key;
+    case 'null': return vscode.SymbolKind.Null;
+    case 'enumMember': return vscode.SymbolKind.EnumMember;
+    case 'struct': return vscode.SymbolKind.Struct;
+    case 'event': return vscode.SymbolKind.Event;
+    case 'operator': return vscode.SymbolKind.Operator;
+    case 'typeParameter': return vscode.SymbolKind.TypeParameter;
+    default: return vscode.SymbolKind.Object;
+  }
+}
 
-export function findSymbolAtPosition( symbols: vscode.DocumentSymbol[], position: vscode.Position ): vscode.DocumentSymbol | undefined {
-  for ( const sym of symbols ) {
-    if ( sym.range.contains( position ) ) {
-      // Search children first (deepest match wins)
-      const child = findSymbolAtPosition( sym.children, position );
-      return child ?? sym;
+function kindToName( kind: vscode.SymbolKind ): string {
+  switch ( kind ) {
+    case vscode.SymbolKind.File: return 'file';
+    case vscode.SymbolKind.Module: return 'module';
+    case vscode.SymbolKind.Namespace: return 'namespace';
+    case vscode.SymbolKind.Package: return 'package';
+    case vscode.SymbolKind.Class: return 'class';
+    case vscode.SymbolKind.Method: return 'method';
+    case vscode.SymbolKind.Property: return 'property';
+    case vscode.SymbolKind.Field: return 'field';
+    case vscode.SymbolKind.Constructor: return 'constructor';
+    case vscode.SymbolKind.Enum: return 'enum';
+    case vscode.SymbolKind.Interface: return 'interface';
+    case vscode.SymbolKind.Function: return 'function';
+    case vscode.SymbolKind.Variable: return 'variable';
+    case vscode.SymbolKind.Constant: return 'constant';
+    case vscode.SymbolKind.String: return 'string';
+    case vscode.SymbolKind.Number: return 'number';
+    case vscode.SymbolKind.Boolean: return 'boolean';
+    case vscode.SymbolKind.Array: return 'array';
+    case vscode.SymbolKind.Object: return 'object';
+    case vscode.SymbolKind.Key: return 'key';
+    case vscode.SymbolKind.Null: return 'null';
+    case vscode.SymbolKind.EnumMember: return 'enumMember';
+    case vscode.SymbolKind.Struct: return 'struct';
+    case vscode.SymbolKind.Event: return 'event';
+    case vscode.SymbolKind.Operator: return 'operator';
+    case vscode.SymbolKind.TypeParameter: return 'typeParameter';
+    default: return 'object';
+  }
+}
+
+function attachParents( roots: SymbolNode[] ): void {
+  function walk( node: SymbolNode, parent?: SymbolNode ) {
+    node.parent = parent;
+    if ( node.children?.length ) {
+      for ( const child of node.children ) {
+        walk( child, node );
+      }
     }
   }
+
+  for ( const root of roots ) {
+    walk( root, undefined );
+  }
+}
+
+function toSymbolNodesFromDocumentSymbols( symbols: vscode.DocumentSymbol[], uri: vscode.Uri ): SymbolNode[] {
+  return symbols.map( s => ( {
+    name: ( vscode.window.activeTextEditor && s.kind === vscode.SymbolKind.String )
+      ? vscode.window.activeTextEditor.document.getText( s.range )
+      : s.name,
+    detail: kindToName( s.kind ),
+    kind: s.kind,
+    range: s.range,
+    selectionRange: s.selectionRange,
+    uri,
+    children: toSymbolNodesFromDocumentSymbols( s.children, uri )
+      .sort( ( a, b ) => a.range.start.isBefore( b.range.start ) ? -1 : 1 ),
+    parent: undefined
+  } ) );
+}
+
+function toSymbolNodesFromNodeTreeItems( items: NodeTreeItem[], uri: vscode.Uri ): SymbolNode[] {
+  return items.map( item => ( {
+    name: item.node.label,
+    detail: item.node.detail,
+    kind: nameToKind( item.node.kind ),
+    range: item.node.range,
+    selectionRange: item.node.selectionRange,
+    uri,
+    children: toSymbolNodesFromNodeTreeItems( item.children, uri ),
+    parent: undefined
+  } ) );
+}
+
+async function getDocumentSymbolsWithRetry(
+  uri: vscode.Uri,
+  attempts = [1, 2, 3, 4, 5],
+  delayMs = 200
+): Promise<vscode.DocumentSymbol[] | undefined> {
+
+  for await ( const attempt of attempts ) {
+    const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[] | undefined>(
+      'vscode.executeDocumentSymbolProvider',
+      uri
+    );
+
+    if ( symbols?.length ) {
+      return symbols;
+    }
+
+    await new Promise( resolve => setTimeout( resolve, delayMs * ( 1 + attempt * 0.5 ) ) );
+  }
+
   return undefined;
 }
 
+async function buildSymbolsForDocument( document: vscode.TextDocument, source: SymbolSource ): Promise<SymbolNode[]> {
+  let symbols: SymbolNode[] = [];
 
-// const editor = vscode.window.activeTextEditor;
+  if ( source === 'tsc' ) {
+    const nodes = await collectSymbolItemsFromSource( document );
+    if ( nodes.length ) {
+      const tree = await buildNodeTree( nodes );
+      symbols = toSymbolNodesFromNodeTreeItems( tree, document.uri );
+    }
+  }
+  else {
+    const docSymbols = await getDocumentSymbolsWithRetry( document.uri );
+    if ( docSymbols?.length ) {
+      symbols = toSymbolNodesFromDocumentSymbols( docSymbols, document.uri );
+    }
+  }
 
-// if ( editor && symbol ) {
-//   editor.selection = new vscode.Selection( symbol.range.start, symbol.range.end );
-//   editor.revealRange( symbol.range, vscode.TextEditorRevealType.InCenter );
-// }
+  attachParents( symbols );
+  return symbols;
+}
 
-// select node? or symbol function here
+async function getCachedSymbolsForEditor( editor: vscode.TextEditor ): Promise<SymbolNode[]> {
+  const _Globals = Globals.default;
+  _Globals.updateIsJSTS( editor );
 
+  const source: SymbolSource = ( _Globals.isJSTS && _Globals.useTypescriptCompiler ) ? 'tsc' : 'vscode';
+  const uri = editor.document.uri;
 
-/**
- * DocumentSymbol version
- * Selects only the body of the current symbol (excluding signature).
- */
-// export async function selectCurrentSymbolBody() {
-//   const editor = vscode.window.activeTextEditor;
-//   if ( !editor ) return;
+  const hit = cache.get( uri );
+  if ( hit && hit.documentVersion === editor.document.version && hit.source === source ) {
+    return hit.symbols;
+  }
 
-//   const document = editor.document;
-//   const position = editor.selection.active;
+  const symbols = await buildSymbolsForDocument( editor.document, source );
+  cache.set( uri, {
+    documentVersion: editor.document.version,
+    source,
+    symbols
+  } );
 
-//   const symbol = await findSymbolAtPosition( document, position );
-//   if ( !symbol ) {
-//     vscode.window.showInformationMessage( "No symbol found at cursor" );
-//     return;
-//   }
+  return symbols;
+}
 
-//   // Body starts after the signature (selectionRange)
-//   const bodyStart = symbol.selectionRange.end;
-//   const bodyEnd = symbol.range.end;
+function getSymbolChainAtPosition( symbols: SymbolNode[], position: vscode.Position ): SymbolNode[] | undefined {
+  const chain: SymbolNode[] = [];
 
-//   const bodyRange = new vscode.Range( bodyStart, bodyEnd );
-
-//   editor.selection = new vscode.Selection( bodyRange.start, bodyRange.end );
-//   editor.revealRange( bodyRange, vscode.TextEditorRevealType.InCenter );
-// }
-
-
-/**
- * DocuemntSymbol version
- * Returns the full symbol chain from root → leaf for the position.
- */
-export async function getSymbolChain( document: vscode.TextDocument, position: vscode.Position ): Promise<vscode.DocumentSymbol[] | undefined> {
-
-  const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
-    'vscode.executeDocumentSymbolProvider',
-    document.uri
-  );
-
-  if ( !symbols ) return undefined;
-
-  const chain: vscode.DocumentSymbol[] = [];
-
-  function walk( list: vscode.DocumentSymbol[] ): boolean {
-    for ( const sym of list ) {
-      if ( sym.range.contains( position ) ) {
-        chain.push( sym );
-        return walk( sym.children ) || true;
+  function walk( list: SymbolNode[] ): boolean {
+    for ( const symbol of list ) {
+      if ( symbol.range.contains( position ) ) {
+        chain.push( symbol );
+        return walk( symbol.children ) || true;
       }
     }
+
     return false;
   }
 
@@ -108,50 +225,66 @@ export async function getSymbolChain( document: vscode.TextDocument, position: v
   return chain.length ? chain : undefined;
 }
 
+export function makeSelectionFromSymbol( editor: vscode.TextEditor, symbol: SymbolNode ): vscode.Selection {
+  if ( symbol.name.startsWith( 'return' ) ) {
+    return new vscode.Selection( symbol.selectionRange.start, symbol.selectionRange.end );
+  }
 
-export async function getTopmostSymbol( document: vscode.TextDocument, position: vscode.Position ): Promise<vscode.DocumentSymbol | undefined> {
-  const chain = await getSymbolChain( document, position );
-  return chain ? chain[0] : undefined;
+  const lastLineLength = editor.document.lineAt( symbol.range.end ).text.length;
+  const extendedRange = symbol.range.with( {
+    start: new vscode.Position( symbol.range.start.line, 0 ),
+    end: new vscode.Position( symbol.range.end.line, lastLineLength )
+  } );
+
+  return new vscode.Selection( extendedRange.start, extendedRange.end );
 }
 
-// same as getCurrentSymbol()
-export async function getDeepestSymbol( document: vscode.TextDocument, position: vscode.Position ): Promise<vscode.DocumentSymbol | undefined> {
-  const chain = await getSymbolChain( document, position );
-  return chain ? chain[chain.length - 1] : undefined;
+export function resetSelectionCycle(): void {
+  cycleState = undefined;
 }
 
+export async function getNextSymbolTarget( editor: vscode.TextEditor ): Promise<{ symbol: SymbolNode; selection: vscode.Selection; } | undefined> {
 
-// function getTSSymbolAtPosition(
-//   program: TS.Program,
-//   sourceFile: TS.SourceFile,
-//   line: number,
-//   column: number
-// ): TS.Symbol | undefined {
+  const uri = editor.document.uri.toString();
 
-//   const checker = program.getTypeChecker();
-//   const pos = sourceFile.getPositionOfLineAndCharacter( line, column );
+  if ( cycleState
+    && cycleState.uri === uri
+    && cycleState.documentVersion === editor.document.version
+    && selectionEquals( editor.selection, cycleState.selection ) ) {
 
-//   const node = findNodeAtPosition( sourceFile, pos );
-//   if ( !node ) return undefined;
+    cycleState.currentIndex = Math.max( 0, cycleState.currentIndex - 1 );
+    const symbol = cycleState.chain[cycleState.currentIndex];
+    const selection = makeSelectionFromSymbol( editor, symbol );
+    cycleState.selection = selection;
 
-//   return checker.getSymbolAtLocation( node );
-// }
+    return { symbol, selection };
+  }
 
+  const symbols = await getCachedSymbolsForEditor( editor );
+  if ( !symbols.length ) {
+    cycleState = undefined;
+    return undefined;
+  }
 
-// function getTSBodyRange( node: TS.Node, sourceFile: TS.SourceFile ): vscode.Range | undefined {
-//   const body = ( node as any ).body;
-//   if ( !body ) return undefined;
+  const chain = getSymbolChainAtPosition( symbols, editor.selection.active );
+  if ( !chain?.length ) {
+    cycleState = undefined;
+    return undefined;
+  }
 
-//   const start = body.getStart( sourceFile );
-//   const end = body.getEnd();
+  const chainKey = makeChainKey( chain );
+  const currentIndex = chain.length - 1;
+  const symbol = chain[currentIndex];
+  const selection = makeSelectionFromSymbol( editor, symbol );
 
-//   const startLC = sourceFile.getLineAndCharacterOfPosition( start );
-//   const endLC = sourceFile.getLineAndCharacterOfPosition( end );
+  cycleState = {
+    uri,
+    documentVersion: editor.document.version,
+    chainKey,
+    chain,
+    currentIndex,
+    selection
+  };
 
-//   return new vscode.Range(
-//     new vscode.Position( startLC.line, startLC.character ),
-//     new vscode.Position( endLC.line, endLC.character )
-//   );
-// }
-
-
+  return { symbol, selection };
+}

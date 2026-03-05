@@ -1,10 +1,11 @@
 import {
 	ExtensionContext, commands, window,
-	Range, Position, Selection, TextEditorRevealType, TreeView
+	Range, Selection, TextEditorRevealType, TreeView
 } from 'vscode';
 import { SymbolsProvider } from './tree';
 import { SymbolPicker, trackQuickPickVisibility } from './quickPick';
 import { showSimpleMessage } from './messages';
+import { getNextSymbolTarget, makeSelectionFromSymbol, resetSelectionCycle } from './symbolLocation';
 import * as Globals from './myGlobals';
 
 const _Globals = Globals.default;
@@ -239,38 +240,44 @@ export async function activate( context: ExtensionContext ) {
 
 		commands.registerCommand( 'symbolsTree.selectSymbol', async ( node: SymbolNode ) => {
 
-			if ( !node && !symbolView.selection.length ) {
-				showSimpleMessage( "There are no symbols selected in the Tree View to select." );
-				return;
-			}
-
 			const editor = window.activeTextEditor;
 			if ( !editor ) return;
 
+			const treeSelection = symbolView?.visible ? symbolView.selection : [];
+
+			if ( !node && !treeSelection.length ) {
+				const target = await getNextSymbolTarget( editor );
+
+				if ( !target ) {
+					showSimpleMessage( "Found no symbol at the current cursor position." );
+					return;
+				}
+
+				editor.selection = target.selection;
+				editor.revealRange( target.symbol.range, TextEditorRevealType.InCenter );
+				await window.showTextDocument( editor.document );
+				return;
+			}
+
+			// Do not continue editor-based parent cycling after a TreeView invocation.
+			resetSelectionCycle();
+
 			let nodeToReveal: SymbolNode | undefined = undefined;
 			if ( node ) nodeToReveal = node;
-			else nodeToReveal = symbolView.selection[0];
+			else nodeToReveal = treeSelection[0];
 
-			let extendedRange;
-			let selections = [];
+			let selections: Selection[] = [];
 			let nodes: SymbolNode[] = [];
 
 			if ( node ) {
-				if ( symbolView.selection.includes( node ) ) nodes.push( ...symbolView.selection );
+				if ( treeSelection.includes( node ) ) nodes.push( ...treeSelection );
 				else nodes.push( node );
 			}
-			else nodes.push( ...symbolView.selection );
+			else nodes.push( ...treeSelection );
 
 			for ( const node of nodes ) {
-				const lastLineLength = editor.document.lineAt( node.range.end ).text.length;
-				if ( node.name.startsWith( 'return' ) ) extendedRange = node.selectionRange;
-				else
-					extendedRange = node.range.with( {
-						start: new Position( node.range.start.line, 0 ),
-						end: new Position( node.range.end.line, lastLineLength )
-					} );
-
-				selections.push( new Selection( extendedRange.start, extendedRange.end ) );
+				const selection = makeSelectionFromSymbol( editor, node );
+				selections.push( selection );
 			}
 
 			editor.selections = selections;
@@ -279,7 +286,9 @@ export async function activate( context: ExtensionContext ) {
 
 			// 'expand: undefined' respects the pre-existing state of the item
 			// 'expand: Number.MAX_SAFE_INTEGER'
-			await symbolView.reveal( node, { expand: undefined, focus: false, select: true } );
+			if ( symbolView && nodeToReveal ) {
+				await symbolView.reveal( nodeToReveal, { expand: undefined, focus: false, select: true } );
+			}
 			await window.showTextDocument( editor.document );  // focus the document to show selections
 		} ),
 	);
@@ -306,3 +315,4 @@ function removeEmptyStringsFromQuery( query: string | string[] ): string | strin
 }
 
 export function deactivate() {}
+
