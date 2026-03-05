@@ -2,13 +2,15 @@
 	"compilerOptions": {
 		"module": "nodenext",
 		"target": "ES2022",
-		"outDir": "out",
+		"noEmit": true,
+		"sourceMap": false,
+		// "outDir": "out",
 		"lib": [
 			"DOM",
 			"ES2022"
 		],
 		// "moduleResolution": "nodenext",  // not necessary
-		"sourceMap": true,
+		// "sourceMap": true,
 		"rootDir": "src",
 		"strict": true, /* enable all strict type-checking options */
 		"noUnusedLocals": true,
