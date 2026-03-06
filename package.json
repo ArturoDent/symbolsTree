@@ -3,7 +3,7 @@
   "displayName": "Symbols Tree",
   "description": "Go to filtered symbols (with optional selection).",
   "preview": true,
-  "version": "0.5.4",
+  "version": "0.6.0",
   "publisher": "ArturoDent",
   "repository": {
     "type": "git",
