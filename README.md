@@ -253,11 +253,11 @@ This command is triggered in one of three ways:
   
 When you have symbols which have parent symbols you can quickly select up yhe parent tree by repeatedly triggering the keybinding as the following demo shows:  
 
-<img src="https://github.com/ArturoDent/symbolsTree/blob/main/images/parentSelection.gif?raw=true" width="750" height="500" alt="Progressively select parent symbols"/>
+<img src="https://github.com/ArturoDent/symbolsTree/blob/main/images/parentSelection.gif?raw=true" width="750" height="400" alt="Progressively select parent symbols"/>
 
 Parent selection also works when starting in the TreeView.  First click on the selection icon (or trigger the `synbolsTree.selectSymbol` command when a TreeItem is focussed) for a symbol, and then you can progressively select parents with the same keybinding as above.  Notice in the TreeView that the parent symbols are shown highlighted/selected with each keybinding trigger and that they are selected in the editor too:  
 
-<img src="https://github.com/ArturoDent/symbolsTree/blob/main/images/parentSelectionInTreeView.gif?raw=true" width="950" height="500" alt="Progressively select parent symbols in a TreeView"/>
+<img src="https://github.com/ArturoDent/symbolsTree/blob/main/images/parentSelectionInTreeView.gif?raw=true" width="1050" height="400" alt="Progressively select parent symbols in a TreeView"/>
 
  As the following demo shows you can also select more than one entry and then click the selection icon to go to and select all those symbols - with multiple cursors being created.  In the demo I use <kbd>Alt</kbd>+<kbd>click</kbd> to select multiple symbols in the TreeView list.  You can also use <kbd>Shift</kbd>+<kbd>click</kbd> to select a range of symbols - each symbol will be selected with its own cursor.  
 
