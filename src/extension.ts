@@ -5,7 +5,7 @@ import {
 import { SymbolsProvider } from './tree';
 import { SymbolPicker, trackQuickPickVisibility } from './quickPick';
 import { showSimpleMessage } from './messages';
-import { getNextSymbolTarget, makeSelectionFromSymbol, resetSelectionCycle } from './symbolLocation';
+import { getNextSymbolTarget, getNextSymbolTargetFromSymbol, makeSelectionFromSymbol, resetSelectionCycle } from './symbolLocation';
 import * as Globals from './myGlobals';
 
 const _Globals = Globals.default;
@@ -242,10 +242,34 @@ export async function activate( context: ExtensionContext ) {
 
 			const editor = window.activeTextEditor;
 			if ( !editor ) return;
-
 			const treeSelection = symbolView?.visible ? symbolView.selection : [];
+			const treeSingleSelection = treeSelection.length === 1 ? treeSelection[0] : undefined;
 
-			if ( !node && !treeSelection.length ) {
+			const selectionMatchesSingleTreeNode = !!treeSingleSelection
+				&& treeSingleSelection.uri.toString() === editor.document.uri.toString()
+				&& ( () => {
+					const treeNodeSelection = makeSelectionFromSymbol( editor, treeSingleSelection );
+					return editor.selection.anchor.isEqual( treeNodeSelection.anchor )
+						&& editor.selection.active.isEqual( treeNodeSelection.active );
+				} )();
+
+			const singleTreeNode = node || ( selectionMatchesSingleTreeNode ? treeSingleSelection : undefined );
+			const shouldUseTreeSelection = !!node || treeSelection.length > 1 || !!singleTreeNode;
+
+			if ( singleTreeNode && singleTreeNode.uri.toString() === editor.document.uri.toString() ) {
+				const target = getNextSymbolTargetFromSymbol( editor, singleTreeNode );
+				if ( target ) {
+					editor.selection = target.selection;
+					editor.revealRange( target.symbol.range, TextEditorRevealType.InCenterIfOutsideViewport );
+					if ( symbolView ) {
+						await symbolView.reveal( target.symbol, { expand: undefined, focus: false, select: true } );
+					}
+					await window.showTextDocument( editor.document );
+					return;
+				}
+			}
+
+			if ( !shouldUseTreeSelection ) {
 				const target = await getNextSymbolTarget( editor );
 
 				if ( !target ) {
@@ -254,12 +278,12 @@ export async function activate( context: ExtensionContext ) {
 				}
 
 				editor.selection = target.selection;
-				editor.revealRange( target.symbol.range, TextEditorRevealType.InCenter );
+				editor.revealRange( target.symbol.range, TextEditorRevealType.InCenterIfOutsideViewport );
 				await window.showTextDocument( editor.document );
 				return;
 			}
 
-			// Do not continue editor-based parent cycling after a TreeView invocation.
+			// Multi-select TreeView behavior: do not continue editor-based parent cycling.
 			resetSelectionCycle();
 
 			let nodeToReveal: SymbolNode | undefined = undefined;
@@ -282,14 +306,12 @@ export async function activate( context: ExtensionContext ) {
 
 			editor.selections = selections;
 			const revealRange = new Range( nodeToReveal.range.start, nodeToReveal.range.end );
-			editor.revealRange( revealRange, TextEditorRevealType.InCenter );
+			editor.revealRange( revealRange, TextEditorRevealType.InCenterIfOutsideViewport );
 
-			// 'expand: undefined' respects the pre-existing state of the item
-			// 'expand: Number.MAX_SAFE_INTEGER'
 			if ( symbolView && nodeToReveal ) {
 				await symbolView.reveal( nodeToReveal, { expand: undefined, focus: false, select: true } );
 			}
-			await window.showTextDocument( editor.document );  // focus the document to show selections
+			await window.showTextDocument( editor.document );
 		} ),
 	);
 

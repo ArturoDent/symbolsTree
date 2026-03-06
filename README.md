@@ -228,15 +228,36 @@ You can also input multiple terms which will be handles like an `or` statement. 
 
 This is a toggle between collapse all  and expand all - there will only be a single icon at a time that appears at the top of the tree to toggle the collapsed status.
 
+ -----------------
+
 * **symbolsTree.expandAll** : <img src="./icons/square-plus.jpg" width="16" height="16" alt="expandAll icon"/>  
  In the Command Palette: ``` Symbols Tree: Expand All ```
 
 -----------------
 
-The following command is triggered by clicking on the **selection** icon ( <img src="./icons/selection.jpg" width="16" height="16" alt="selection icon"/> ) found on each line of the TreeView when hovering over an entry:
-
 * **symbolsTree.selectSymbol**  
  In the Command Palette: ``` Symbols Tree: Select symbol(s)  ```
+
+This command is triggered in one of three ways:  
+
+1.  by clicking on the **selection** icon ( <img src="./icons/selection.jpg" width="16" height="16" alt="selection icon"/> ) found on each line of the TreeView when hovering over an entry;
+2.  by clickig on the **selection** icon on each line of the QuickPick you opened; or  
+3.  by triggering the command ffrom the Command Palette or a keybinding such as  
+
+```jsonc
+{
+  "key": "alt+e",
+  "command": "symbolsTree.selectSymbol"
+}
+  ```
+  
+When you have symbols which have parent symbols you can quickly select up yhe parent tree by repeatedly triggering the keybinding as the following demo shows:  
+
+<img src="https://github.com/ArturoDent/symbolsTree/blob/main/images/parentSelection.gif?raw=true" width="750" height="500" alt="Progressively select parent symbols"/>
+
+Parent selection also works when starting in the TreeView.  First click on the selection icon (or trigger the `synbolsTree.selectSymbol` command when a TreeItem is focussed) for a symbol, and then you can progressively select parents with the same keybinding as above.  Notice in the TreeView that the parent symbols are shown highlighted/selected with each keybinding trigger and that they are selected in the editor too:  
+
+<img src="https://github.com/ArturoDent/symbolsTree/blob/main/images/parentSelectionInTreeView.gif?raw=true" width="950" height="500" alt="Progressively select parent symbols in a TreeView"/>
 
  As the following demo shows you can also select more than one entry and then click the selection icon to go to and select all those symbols - with multiple cursors being created.  In the demo I use <kbd>Alt</kbd>+<kbd>click</kbd> to select multiple symbols in the TreeView list.  You can also use <kbd>Shift</kbd>+<kbd>click</kbd> to select a range of symbols - each symbol will be selected with its own cursor.  
 
@@ -244,10 +265,10 @@ The following command is triggered by clicking on the **selection** icon ( <img 
 
 ---------------
 
-The following command can **ONLY** be triggered by a keybinding:
-
 * **symbolsTree.applyFilter**  
  In the Command Palette: ``` Symbols Tree: Apply a filter from a keybinding  ```
+  
+ This command can **ONLY** be triggered via a keybinding:
 
 ```jsonc
 {

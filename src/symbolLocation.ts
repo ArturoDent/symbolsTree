@@ -225,6 +225,59 @@ function getSymbolChainAtPosition( symbols: SymbolNode[], position: vscode.Posit
   return chain.length ? chain : undefined;
 }
 
+function getChainFromLeaf( leaf: SymbolNode ): SymbolNode[] {
+  const chain: SymbolNode[] = [];
+  let current: SymbolNode | undefined = leaf;
+
+  while ( current ) {
+    chain.push( current );
+    current = current.parent;
+  }
+
+  return chain.reverse();
+}
+
+function getNextSymbolTargetFromChain(
+  editor: vscode.TextEditor,
+  chain: SymbolNode[]
+): { symbol: SymbolNode; selection: vscode.Selection; } | undefined {
+  const uri = editor.document.uri.toString();
+  const chainKey = makeChainKey( chain );
+
+  if ( cycleState
+    && cycleState.uri === uri
+    && cycleState.documentVersion === editor.document.version
+    && selectionEquals( editor.selection, cycleState.selection ) ) {
+
+    cycleState.currentIndex = Math.max( 0, cycleState.currentIndex - 1 );
+    const symbol = cycleState.chain[cycleState.currentIndex];
+    const selection = makeSelectionFromSymbol( editor, symbol );
+    cycleState.selection = selection;
+
+    return { symbol, selection };
+  }
+
+  if ( !chain.length ) {
+    cycleState = undefined;
+    return undefined;
+  }
+
+  const currentIndex = chain.length - 1;
+  const symbol = chain[currentIndex];
+  const selection = makeSelectionFromSymbol( editor, symbol );
+
+  cycleState = {
+    uri,
+    documentVersion: editor.document.version,
+    chainKey,
+    chain,
+    currentIndex,
+    selection
+  };
+
+  return { symbol, selection };
+}
+
 export function makeSelectionFromSymbol( editor: vscode.TextEditor, symbol: SymbolNode ): vscode.Selection {
   if ( symbol.name.startsWith( 'return' ) ) {
     return new vscode.Selection( symbol.selectionRange.start, symbol.selectionRange.end );
@@ -243,22 +296,40 @@ export function resetSelectionCycle(): void {
   cycleState = undefined;
 }
 
-export async function getNextSymbolTarget( editor: vscode.TextEditor ): Promise<{ symbol: SymbolNode; selection: vscode.Selection; } | undefined> {
-
-  const uri = editor.document.uri.toString();
-
-  if ( cycleState
-    && cycleState.uri === uri
-    && cycleState.documentVersion === editor.document.version
-    && selectionEquals( editor.selection, cycleState.selection ) ) {
-
-    cycleState.currentIndex = Math.max( 0, cycleState.currentIndex - 1 );
-    const symbol = cycleState.chain[cycleState.currentIndex];
-    const selection = makeSelectionFromSymbol( editor, symbol );
-    cycleState.selection = selection;
-
-    return { symbol, selection };
+export function getNextSymbolTargetFromSymbol(
+  editor: vscode.TextEditor,
+  symbol: SymbolNode
+): { symbol: SymbolNode; selection: vscode.Selection; } | undefined {
+  const chain = getChainFromLeaf( symbol );
+  if ( !chain.length ) {
+    cycleState = undefined;
+    return undefined;
   }
+
+  const symbolSelection = makeSelectionFromSymbol( editor, symbol );
+
+  // Explicit selection-icon clicks on a different tree item should start a new cycle from that item.
+  if ( !selectionEquals( editor.selection, symbolSelection ) ) {
+    const currentIndex = chain.length - 1;
+    cycleState = {
+      uri: editor.document.uri.toString(),
+      documentVersion: editor.document.version,
+      chainKey: makeChainKey( chain ),
+      chain,
+      currentIndex,
+      selection: symbolSelection
+    };
+
+    return {
+      symbol: chain[currentIndex],
+      selection: symbolSelection
+    };
+  }
+
+  return getNextSymbolTargetFromChain( editor, chain );
+}
+
+export async function getNextSymbolTarget( editor: vscode.TextEditor ): Promise<{ symbol: SymbolNode; selection: vscode.Selection; } | undefined> {
 
   const symbols = await getCachedSymbolsForEditor( editor );
   if ( !symbols.length ) {
@@ -267,24 +338,7 @@ export async function getNextSymbolTarget( editor: vscode.TextEditor ): Promise<
   }
 
   const chain = getSymbolChainAtPosition( symbols, editor.selection.active );
-  if ( !chain?.length ) {
-    cycleState = undefined;
-    return undefined;
-  }
-
-  const chainKey = makeChainKey( chain );
-  const currentIndex = chain.length - 1;
-  const symbol = chain[currentIndex];
-  const selection = makeSelectionFromSymbol( editor, symbol );
-
-  cycleState = {
-    uri,
-    documentVersion: editor.document.version,
-    chainKey,
-    chain,
-    currentIndex,
-    selection
-  };
-
-  return { symbol, selection };
+  return getNextSymbolTargetFromChain( editor, chain || [] );
 }
+
+

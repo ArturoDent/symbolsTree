@@ -122,10 +122,6 @@
           "when": "symbolsTree.visible && symbolsTree.hasSelection"
         },
         {
-          "command": "symbolsTree.selectSymbol",
-          "when": "symbolsTree.visible && symbolsTree.hasSelection"
-        },
-        {
           "command": "symbolsTree.refreshTree",
           "when": "symbolsTree.visible"
         },
