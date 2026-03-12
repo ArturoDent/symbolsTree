@@ -15,7 +15,7 @@
 		"strict": true, /* enable all strict type-checking options */
 		"noUnusedLocals": true,
 		"types": [
-			// "@types/vscode",
+			"@types/vscode",
 			"node", // for the setTimeout and quickpick.ts/import util/types
 			"mocha" // for the src/text/assert's
 		]

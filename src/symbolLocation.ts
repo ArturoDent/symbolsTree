@@ -1,16 +1,10 @@
 import * as vscode from 'vscode';
 import { buildNodeTree, collectSymbolItemsFromSource } from './nodeList';
 import * as Globals from './myGlobals';
-import { BoundedCache } from './mapCache';
+import { getSymbolCache, type SymbolSource } from './sharedSymbolCache';
 import type { NodeTreeItem, SymbolNode } from './types';
 
-type SymbolSource = 'vscode' | 'tsc';
 
-type EditorSymbolCache = {
-  documentVersion: number;
-  source: SymbolSource;
-  symbols: SymbolNode[];
-};
 
 type SelectionCycleState = {
   uri: string;
@@ -21,7 +15,7 @@ type SelectionCycleState = {
   selection: vscode.Selection;
 };
 
-const cache = new BoundedCache<vscode.Uri, EditorSymbolCache>( 3 );
+const cache = getSymbolCache();
 let cycleState: SelectionCycleState | undefined;
 
 function selectionEquals( a: vscode.Selection, b: vscode.Selection ): boolean {
@@ -186,6 +180,7 @@ async function buildSymbolsForDocument( document: vscode.TextDocument, source: S
 }
 
 async function getCachedSymbolsForEditor( editor: vscode.TextEditor ): Promise<SymbolNode[]> {
+
   const _Globals = Globals.default;
   _Globals.updateIsJSTS( editor );
 
@@ -193,21 +188,25 @@ async function getCachedSymbolsForEditor( editor: vscode.TextEditor ): Promise<S
   const uri = editor.document.uri;
 
   const hit = cache.get( uri );
-  if ( hit && hit.documentVersion === editor.document.version && hit.source === source ) {
-    return hit.symbols;
+  if ( hit && !hit.refreshSymbols && hit.documentVersion === editor.document.version && hit.source === source ) {
+    return hit.allSymbols;
   }
 
   const symbols = await buildSymbolsForDocument( editor.document, source );
   cache.set( uri, {
     documentVersion: editor.document.version,
     source,
-    symbols
+    refreshSymbols: false,
+    filterQuery: '',
+    allSymbols: symbols,
+    filteredSymbols: []
   } );
 
   return symbols;
 }
 
 function getSymbolChainAtPosition( symbols: SymbolNode[], position: vscode.Position ): SymbolNode[] | undefined {
+
   const chain: SymbolNode[] = [];
 
   function walk( list: SymbolNode[] ): boolean {
@@ -241,6 +240,7 @@ function getNextSymbolTargetFromChain(
   editor: vscode.TextEditor,
   chain: SymbolNode[]
 ): { symbol: SymbolNode; selection: vscode.Selection; } | undefined {
+
   const uri = editor.document.uri.toString();
   const chainKey = makeChainKey( chain );
 
@@ -279,6 +279,7 @@ function getNextSymbolTargetFromChain(
 }
 
 export function makeSelectionFromSymbol( editor: vscode.TextEditor, symbol: SymbolNode ): vscode.Selection {
+
   if ( symbol.name.startsWith( 'return' ) ) {
     return new vscode.Selection( symbol.selectionRange.start, symbol.selectionRange.end );
   }
@@ -300,6 +301,7 @@ export function getNextSymbolTargetFromSymbol(
   editor: vscode.TextEditor,
   symbol: SymbolNode
 ): { symbol: SymbolNode; selection: vscode.Selection; } | undefined {
+
   const chain = getChainFromLeaf( symbol );
   if ( !chain.length ) {
     cycleState = undefined;
@@ -340,5 +342,6 @@ export async function getNextSymbolTarget( editor: vscode.TextEditor ): Promise<
   const chain = getSymbolChainAtPosition( symbols, editor.selection.active );
   return getNextSymbolTargetFromChain( editor, chain || [] );
 }
+
 
 

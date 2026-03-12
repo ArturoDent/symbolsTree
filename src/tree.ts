@@ -3,21 +3,13 @@ import { collectSymbolItemsFromSource, buildNodeTree, filterTree } from './nodeL
 import type { NodeTreeItem, SymbolNode } from './types';
 import { TreeCache, type CacheUse } from './types';
 import { showTreeViewMessage, showQuickPickMessage } from './messages';
-import { BoundedCache } from './mapCache';
+import { getSymbolCache, getSymbolSourceForDocument, type SymbolCacheEntry } from './sharedSymbolCache';
 import { debounce } from "ts-debounce";
 import * as Globals from './myGlobals';
 
 
 let filteredTreeSymbols: SymbolNode[] = [];
 
-// Define a type for the BoundedCache value, key is a Uri
-// add program and sourceFile ?
-type TreeCache = {
-  refreshSymbols: boolean;
-  filterQuery: string | string[];
-  allSymbols: SymbolNode[];
-  filteredSymbols: SymbolNode[];
-};
 
 
 export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
@@ -28,8 +20,8 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
   private disposables: vscode.Disposable[] = [];
   private view?: vscode.TreeView<SymbolNode>;
 
-  // Create a bounded cache of Map <Uri → TreeCache> with max size 3
-  private cache = new BoundedCache<vscode.Uri, TreeCache>( 3 );
+  // Create a bounded cache of Map <Uri -> SymbolCacheEntry> with max size 3
+  private cache = getSymbolCache();
   public debouncedRefresh: ReturnType<typeof debounce>;
 
   public static lockedUri: vscode.Uri | undefined = undefined;
@@ -41,7 +33,6 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
 
   constructor( context: vscode.ExtensionContext ) {
 
-    context.subscriptions.push( this.cache );
 
     // create a debounced async function
     // 800ms seems to be necessary to avaoid a rapid switching between editors problem
@@ -56,8 +47,15 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
           } );
         }
         else {
-          this.cache.set( event.document.uri,
-            { refreshSymbols: true, filterQuery: '', allSymbols: [], filteredSymbols: [] } );
+          const source = getSymbolSourceForDocument( event.document, Globals.default.useTypescriptCompiler );
+          this.cache.set( event.document.uri, {
+            documentVersion: event.document.version,
+            source,
+            refreshSymbols: true,
+            filterQuery: '',
+            allSymbols: [],
+            filteredSymbols: []
+          } );
         }
       }
     } ) );
@@ -139,12 +137,16 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
     const editor = vscode.window.activeTextEditor;
     const uri = editor?.document.uri || SymbolsProvider.lockedUri || this.cache.getLastVisitedUri();
     if ( !uri ) return;
+    const document = vscode.workspace.textDocuments.find( d => d.uri.toString() === uri.toString() ) || editor?.document;
+    const source = ( _Globals.isJSTS && _Globals.useTypescriptCompiler ) ? 'tsc' : 'vscode';
+    const documentVersion = document?.version ?? editor?.document.version ?? 0;
 
     let docSymbols: SymbolNode[] | NodeTreeItem[];
     let treeSymbols: SymbolNode[] = [];
 
     // Map.get() can return undefined if key not found
-    let thisUriCache: TreeCache | undefined = this.cache.get( uri );
+    let thisUriCache: SymbolCacheEntry | undefined = this.cache.get( uri );
+    if ( thisUriCache && thisUriCache.source !== source ) thisUriCache = undefined;
     if ( thisUriCache && !this.filterQuery.length ) this.filterQuery = thisUriCache.filterQuery || '';
 
     if ( useCache === TreeCache.UseFilterAndAllNodes && thisUriCache && !thisUriCache.refreshSymbols ) {
@@ -178,7 +180,7 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
 
     if ( _Globals.makeTreeView && _Globals.useTypescriptCompiler && _Globals.isJSTS ) {
 
-      const doc = vscode.workspace.textDocuments.find( d => d.uri.toString() === uri.toString() );
+      const doc = document;
       if ( !doc ) return;
       const nodes = await collectSymbolItemsFromSource( doc );
       if ( nodes?.length ) {
@@ -229,11 +231,11 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
     // rebuild cache
     if ( filterQuery.length > 0 && filteredTreeSymbols.length ) {
       this.tree = filteredTreeSymbols;
-      this.cache.set( uri, { refreshSymbols: false, filterQuery: this.filterQuery, allSymbols: treeSymbols, filteredSymbols: filteredTreeSymbols } );
+      this.cache.set( uri, { documentVersion, source, refreshSymbols: false, filterQuery: this.filterQuery, allSymbols: treeSymbols, filteredSymbols: filteredTreeSymbols } );
     }
     else {
       this.tree = treeSymbols;
-      this.cache.set( uri, { refreshSymbols: false, filterQuery: this.filterQuery, allSymbols: treeSymbols, filteredSymbols: filteredTreeSymbols } );
+      this.cache.set( uri, { documentVersion, source, refreshSymbols: false, filterQuery: this.filterQuery, allSymbols: treeSymbols, filteredSymbols: filteredTreeSymbols } );
     }
 
     this._onDidChangeTreeData.fire();
