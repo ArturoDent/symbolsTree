@@ -4,7 +4,9 @@ Show a **QuickPick** with all or just filtered symbols.  Items can be filtered b
 
 You can also show a **TreeView** in the SideBar or Secondary SideBar that allows jumping and selecting and filtering.
 
-Click on an item to go to that symbol **OR** to go to and select that entire symbol and its children - in the TreeView or the QuickPick
+Click on an item to go to that symbol **OR** to go to and select that entire symbol and its children - in the TreeView or the QuickPick.
+
+Quickly select the parent of any symbol, and then the parent of that parent, etc.  
 
 ## Symbols TreeView
 
