@@ -7,7 +7,7 @@ let tsModulePromise: Promise<typeof import( "typescript" )> | null = null;
 import type * as TS from "typescript";
 
 
-export async function getTypescript() {
+export async function getTypescript () {
   if ( !tsModulePromise ) {
     tsModulePromise = import( "typescript" );
   }
@@ -15,7 +15,7 @@ export async function getTypescript() {
 }
 
 
-export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise<NodePickItems> {
+export async function collectSymbolItemsFromSource ( doc: TextDocument ): Promise<NodePickItems> {
 
   let ts: typeof import( "typescript" );
 
@@ -23,7 +23,7 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
     ts = await getTypescript();
   } catch ( err ) {
     window.showErrorMessage(
-      `Failed to load the TypeScript compiler: ${err}`
+      `Failed to load the TypeScript compiler: ${ err }`
     );
     return [];  // could fallback to non-tsc objects here
   }
@@ -38,7 +38,7 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
 
   const out: NodePickItems = [];
 
-  function extractPropertyChain( expr: TS.Expression ): string[] {
+  function extractPropertyChain ( expr: TS.Expression ): string[] {
     const chain: string[] = [];
     let current: TS.Expression = expr;
 
@@ -68,7 +68,7 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
 
   // add interface, enum, constant, string, number, boolean, array, key
 
-  function visitWithDepth( node: TS.Node | undefined, depth: number, container: string[] ) {
+  function visitWithDepth ( node: TS.Node | undefined, depth: number, container: string[] ) {
     if ( !node ) return;
     if ( visited.has( node ) ) return;
     visited.add( node );
@@ -76,11 +76,11 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
     // ts.isSourceFile(node)  // true for SourceFile
 
     const nameFrom = ( id: TS.Identifier | TS.StringLiteral | TS.NumericLiteral ) => id.text;
-    const fullName = ( name: string ) => [...container, name].join( "." );
+    const fullName = ( name: string ) => [ ...container, name ].join( "." );
 
     if ( ts.isFunctionDeclaration( node ) && node.name ) {
       const name = node.name.text;
-      const newContainer = [...container, name];
+      const newContainer = [ ...container, name ];
       const { asString } = getParameterDetails( ts, sourceFile, node.parameters, doc );
 
       out.push( {
@@ -91,7 +91,7 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
         // end: node.name.getEnd(),
         range: new Range( doc.positionAt( node.getStart( sourceFile ) ), doc.positionAt( node.getEnd() ) ),
         selectionRange: new Range( doc.positionAt( node.name.getStart( sourceFile ) ), doc.positionAt( node.name.getEnd() ) ),
-        label: `${name} ( ${asString} )`,
+        label: `${ name } ( ${ asString } )`,
         detail: "function declaration",
         parent: depth ? node.parent : undefined
       } );
@@ -115,14 +115,14 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
         // end: node.getEnd(),
         range: new Range( doc.positionAt( node.getStart( sourceFile ) ), doc.positionAt( node.getEnd() ) ),
         selectionRange: new Range( doc.positionAt( node.getStart( sourceFile ) ), doc.positionAt( node.getStart( sourceFile ) ) ),
-        label: `( ${asString} ) =>  `,
+        label: `( ${ asString } ) =>  `,
         detail: "anonymous function",
         parent: depth ? node.parent : undefined
       } );
 
       if ( ts.isBlock( node.body ) ) {
         node.body.statements.forEach( stmt =>
-          visitWithDepth( stmt, depth + 1, [...container, name] )
+          visitWithDepth( stmt, depth + 1, [ ...container, name ] )
         );
       }
       return;
@@ -139,13 +139,13 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
         // end: node.name.getEnd(),
         range: new Range( doc.positionAt( node.getStart( sourceFile ) ), doc.positionAt( node.getEnd() ) ),
         selectionRange: new Range( doc.positionAt( node.expression.getStart( sourceFile ) ), doc.positionAt( node.expression.getStart( sourceFile ) ) ),
-        label: `switch (${text})`,
+        label: `switch (${ text })`,
         detail: "switch",
         parent: depth ? node.parent : undefined
       } );
       if ( node.caseBlock.clauses ) {
         node.caseBlock.clauses.forEach( clause =>
-          visitWithDepth( clause, depth + 1, [...container, "switch"] )
+          visitWithDepth( clause, depth + 1, [ ...container, "switch" ] )
         );
       }
     }
@@ -161,12 +161,12 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
         // end: node.name.getEnd(),
         range: new Range( doc.positionAt( node.getStart( sourceFile ) ), doc.positionAt( node.getEnd() ) ),
         selectionRange: new Range( doc.positionAt( node.expression.getStart( sourceFile ) ), doc.positionAt( node.expression.getStart( sourceFile ) ) ),
-        label: `case: ${text}`,
+        label: `case: ${ text }`,
         detail: "case",
         parent: depth ? node.parent : undefined
       } );
       node.statements.forEach( stmt =>
-        visitWithDepth( stmt, depth + 1, [...container, text] )
+        visitWithDepth( stmt, depth + 1, [ ...container, text ] )
       );
     }
 
@@ -184,7 +184,7 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
         parent: depth ? node.parent : undefined
       } );
       node.statements.forEach( stmt =>
-        visitWithDepth( stmt, depth + 1, [...container, 'default'] )
+        visitWithDepth( stmt, depth + 1, [ ...container, 'default' ] )
       );
     }
 
@@ -215,12 +215,12 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
         // end: node.name.getEnd(),
         selectionRange: new Range( doc.positionAt( node.name.getStart( sourceFile ) ), doc.positionAt( node.name.getEnd() ) ),
         range: new Range( doc.positionAt( node.getStart( sourceFile ) ), doc.positionAt( node.getEnd() ) ),
-        label: superString ? `${name}${superString}` : name,
+        label: superString ? `${ name }${ superString }` : name,
         detail: "class declaration",
         parent: depth ? node.parent : undefined
       } );
 
-      const classContainer = [...container, name];
+      const classContainer = [ ...container, name ];
 
       node.members.forEach( member => {
 
@@ -229,19 +229,19 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
           const { asString } = getParameterDetails( ts, sourceFile, member.parameters, doc );
 
           out.push( {
-            name: [...classContainer, "constructor"].join( "." ),
+            name: [ ...classContainer, "constructor" ].join( "." ),
             kind: "constructor",
             depth: depth + 1,
             pos: member.getStart( sourceFile ),
             // end: member.getEnd(),
             range: new Range( doc.positionAt( member.getStart( sourceFile ) ), doc.positionAt( member.getEnd() ) ),
             selectionRange: new Range( doc.positionAt( member.getStart( sourceFile ) ), doc.positionAt( member.getStart( sourceFile ) ) ),
-            label: `constructor ( ${asString} )`,
-            detail: `${name} constructor`,
+            label: `constructor ( ${ asString } )`,
+            detail: `${ name } constructor`,
             parent: depth ? node.parent : undefined
           } );
           member.body?.statements.forEach( stmt =>
-            visitWithDepth( stmt, depth + 2, [...classContainer, "constructor"] )
+            visitWithDepth( stmt, depth + 2, [ ...classContainer, "constructor" ] )
           );
         }
 
@@ -251,19 +251,19 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
           const { asString } = getParameterDetails( ts, sourceFile, member.parameters, doc );
 
           out.push( {
-            name: [...classContainer, methodName].join( "." ),
+            name: [ ...classContainer, methodName ].join( "." ),
             kind: "method",
             depth: depth + 1,
             pos: member.name.getStart( sourceFile ),
             // end: member.name.getEnd(),
             range: new Range( doc.positionAt( member.getStart( sourceFile ) ), doc.positionAt( member.getEnd() ) ),
             selectionRange: new Range( doc.positionAt( member.name.getStart( sourceFile ) ), doc.positionAt( member.name.getStart( sourceFile ) ) ),
-            label: `${methodName} ( ${asString} )`,
-            detail: `${name} method`,
+            label: `${ methodName } ( ${ asString } )`,
+            detail: `${ name } method`,
             parent: depth ? node.parent : undefined
           } );
           member.body?.statements.forEach( stmt =>
-            visitWithDepth( stmt, depth + 2, [...classContainer, methodName] )
+            visitWithDepth( stmt, depth + 2, [ ...classContainer, methodName ] )
           );
         }
 
@@ -273,15 +273,15 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
           const initText = member.initializer?.getText( sourceFile );
 
           out.push( {
-            name: [...classContainer, propName].join( "." ),
+            name: [ ...classContainer, propName ].join( "." ),
             kind: "property",
             depth: depth + 1,
             pos: member.name.getStart( sourceFile ),
             // end: member.name.getEnd(),
             range: new Range( doc.positionAt( member.getStart( sourceFile ) ), doc.positionAt( member.getEnd() ) ),
             selectionRange: new Range( doc.positionAt( member.name.getStart( sourceFile ) ), doc.positionAt( member.name.getEnd() ) ),
-            label: `${propName} = ${initText}`,
-            detail: `${name} property`,
+            label: `${ propName } = ${ initText }`,
+            detail: `${ name } property`,
             parent: depth ? node.parent : undefined
           } );
         }
@@ -306,10 +306,10 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
         let fullName = "";
 
         chain.forEach( ( segment, i ) => {
-          fullName = fullName ? `${fullName}.${segment}` : segment;
+          fullName = fullName ? `${ fullName }.${ segment }` : segment;
 
           // noop ! if there is a preceding duplicate
-          if ( out.length > 0 && out.find( ( item ) => item.name === fullName && item.depth === depth ) ) {}
+          if ( out.length > 0 && out.find( ( item ) => item.name === fullName && item.depth === depth ) ) { }
 
           // myObj.prop1 = (arg1) => { }
           else {
@@ -341,7 +341,7 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
               label: segment,
               detail: i === chain.length - 1
                 ? innerName
-                  ? `assigned function '${innerName}'`
+                  ? `assigned function '${ innerName }'`
                   : "assigned function"
                 : "container object",
               parent: depth ? node.parent : undefined
@@ -364,7 +364,7 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
             );
 
           out.push( {
-            name: `${fullName} (anonymous)`,
+            name: `${ fullName } (anonymous)`,
             kind: "anonymous",
             depth: depth + chain.length,
             pos: right.getStart( sourceFile ),
@@ -376,7 +376,7 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
             //   : new Range(doc.positionAt((left as TS.PropertyAccessExpression).getStart(sourceFile)), doc.positionAt((left as TS.PropertyAccessExpression).getStart(sourceFile))),
 
             selectionRange,
-            label: `( ${asString} ) =>  `,
+            label: `( ${ asString } ) =>  `,
             detail: "anonymous function",
             parent: depth ? node.parent : undefined
           } );
@@ -393,7 +393,7 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
               new Range( doc.positionAt( right.name.getStart( sourceFile ) ), doc.positionAt( right.name.getStart( sourceFile ) ) )
               : new Range( doc.positionAt( right.getStart( sourceFile ) ), doc.positionAt( right.getStart( sourceFile ) ) ),
 
-            label: `${innerName}()`,
+            label: `${ innerName }()`,
             detail: "inner named function",
             parent: depth ? node.parent : undefined
           } );
@@ -401,7 +401,7 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
 
         if ( ts.isBlock( body ) ) {
           body.statements.forEach( stmt =>
-            visitWithDepth( stmt, depth + chain.length, [...container, fullName] )
+            visitWithDepth( stmt, depth + chain.length, [ ...container, fullName ] )
           );
         }
 
@@ -453,7 +453,7 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
 
         selectionRange,
 
-        label: `${chain.at( -1 )}: ${value}`,
+        label: `${ chain.at( -1 ) }: ${ value }`,
         detail: "object property",
         parent: depth ? node.parent : undefined
       } );
@@ -483,25 +483,25 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
       if ( init && ts.isArrowFunction( init ) ) {
         kind = "arrow";
         // label = `${name} ( ${getParameterDetails(ts, sourceFile, (init as ts.FunctionExpression).parameters, doc).asString} )`;
-        label = `${name} ( ${getParameterDetails( ts, sourceFile, ( init ).parameters, doc ).asString} )`;
+        label = `${ name } ( ${ getParameterDetails( ts, sourceFile, ( init ).parameters, doc ).asString } )`;
         detail = "variable ➜ arrow function";
       }
       else if ( init && ts.isFunctionExpression( init ) ) {
         kind = "function";
         // label = `${name} ( ${getParameterDetails(ts, sourceFile, (init as TS.FunctionExpression).parameters, doc).asString} )`;
-        label = `${name} ( ${getParameterDetails( ts, sourceFile, init.parameters, doc ).asString} )`;
+        label = `${ name } ( ${ getParameterDetails( ts, sourceFile, init.parameters, doc ).asString } )`;
         detail = "variable ➜ function";
       }
       else if ( init && ts.isPropertyAccessExpression( init ) ) {
         kind = "property";
-        label = `${name} = ${init?.getText( sourceFile )}`;
+        label = `${ name } = ${ init?.getText( sourceFile ) }`;
         detail = "variable ➜ object property";
       }
       // else if (init && ts.isCallExpression(init) && ts.isPropertyAccessExpression((init as TS.CallExpression).expression)) {
       else if ( init && ts.isCallExpression( init ) && ts.isPropertyAccessExpression( init.expression ) ) {
         kind = "call";
 
-        label = `${name} = ${init?.getText( sourceFile )}`;
+        label = `${ name } = ${ init?.getText( sourceFile ) }`;
         detail = "variable ➜ method call";
       }
       else if ( init && ts.isObjectLiteralExpression( init ) ) {
@@ -512,7 +512,7 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
       }
       else {
         kind = "variable";
-        label = `${name} = ${init?.getText( sourceFile )}`;
+        label = `${ name } = ${ init?.getText( sourceFile ) }`;
         detail = ( init && ts.isNewExpression( init ) ) ? "variable ➜ new()" : "variable";  //  isNewExpression = 215
       }
 
@@ -534,12 +534,12 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
         ( ts.isArrowFunction( init ) || ts.isFunctionExpression( init ) ) && ts.isBlock( init.body )
       ) {
         init.body.statements.forEach( stmt =>
-          visitWithDepth( stmt, depth + 1, [...container, name] )
+          visitWithDepth( stmt, depth + 1, [ ...container, name ] )
         );
       }
 
       if ( init && isObj ) { // check if the object is empty
-        visitWithDepth( init, depth + 1, [...container, name] );
+        visitWithDepth( init, depth + 1, [ ...container, name ] );
       }
       return;
     }
@@ -598,7 +598,7 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
             // end: prop.name.getEnd(),
             range: new Range( doc.positionAt( prop.getStart( sourceFile ) ), doc.positionAt( prop.getEnd() ) ),
             selectionRange: new Range( doc.positionAt( prop.name.getStart( sourceFile ) ), doc.positionAt( prop.name.getStart( sourceFile ) ) ),
-            label: isFunc ? `${prop.name.text}: ( ${paramsText} )` : isVar ? `${prop.name.text}: ${initText}` : prop.name.text,
+            label: isFunc ? `${ prop.name.text }: ( ${ paramsText } )` : isVar ? `${ prop.name.text }: ${ initText }` : prop.name.text,
             detail: ( isFunc || isMethod ) ? "object method" : isObj ? "nested object" : "object property",
             parent: depth ? node.parent : undefined
           } );
@@ -610,18 +610,18 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
           // this handles let myVariable = { method1: function (inMethod1) { ...variables and properties in here...} }
           if ( ts.isFunctionLike( init ) && init.body && ts.isBlock( init.body ) ) {
             init.body.statements.forEach( ( stmt: TS.Statement ) =>
-              visitWithDepth( stmt, depth + 1, [...container, name] )
+              visitWithDepth( stmt, depth + 1, [ ...container, name ] )
             );
           }
           // else if (isMethod && prop.body && ts.isBlock(prop.body as TS.Node)) {
           else if ( isMethod && prop.body ) {
             prop.body.statements.forEach( stmt =>
-              visitWithDepth( stmt, depth + 1, [...container, name] )
+              visitWithDepth( stmt, depth + 1, [ ...container, name ] )
             );
           }
 
           if ( init && isObj ) {  // if object is empty skip this ?
-            visitWithDepth( init, depth + 1, [...container, name] );
+            visitWithDepth( init, depth + 1, [ ...container, name ] );
           }
         }
       } );
@@ -643,12 +643,12 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
       if ( ts.isPropertyAccessExpression( expr ) ) {   // for myObject/myClass.method(arg1)
         propName = expr.getText( sourceFile );
         name = fullName( propName );
-        label = `${propName} ( ${asString} )`;
-        detail = `${expr.expression.getText( sourceFile )} method call`;
+        label = `${ propName } ( ${ asString } )`;
+        detail = `${ expr.expression.getText( sourceFile ) } method call`;
       }
       else if ( ts.isIdentifier( expr ) ) {   // simple("howdy")
         name = fullName( expr.text );
-        label = `${expr.text} ( ${asString} )`;
+        label = `${ expr.text } ( ${ asString } )`;
         detail = 'call';
       }
 
@@ -685,8 +685,8 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
         selectionRange: ( node.expression ) ? new Range( doc.positionAt( node.expression.getStart( sourceFile ) ), doc.positionAt( node.expression.getEnd() ) )
           : new Range( doc.positionAt( node.getStart( sourceFile ) ), doc.positionAt( node.getEnd() ) ),
 
-        label: `${node.getText()}`,
-        detail: path ? `${path.join( ' > ' )} > return` : "return",
+        label: `${ node.getText() }`,
+        detail: path ? `${ path.join( ' > ' ) } > return` : "return",
         parent: depth ? node.parent : undefined
       } );
 
@@ -705,7 +705,7 @@ export async function collectSymbolItemsFromSource( doc: TextDocument ): Promise
 
 
 // function getParameterDetails( ts: typeof import( "typescript" ), sourceFile: TS.SourceFile, params: TS.NodeArray<TS.ParameterDeclaration | TS.Expression>, doc: TextDocument ): { selectionRange: Range | undefined; asString: string; } {
-function getParameterDetails( ts: typeof import( "typescript" ), sourceFile: TS.SourceFile, params: TS.NodeArray<TS.ParameterDeclaration | TS.Expression>, doc: TextDocument ): { selectionRange: Range | undefined; asString: string; } {
+function getParameterDetails ( ts: typeof import( "typescript" ), sourceFile: TS.SourceFile, params: TS.NodeArray<TS.ParameterDeclaration | TS.Expression>, doc: TextDocument ): { selectionRange: Range | undefined; asString: string; } {
 
   let start, end;
   const asString = params.map( p => {
@@ -716,7 +716,7 @@ function getParameterDetails( ts: typeof import( "typescript" ), sourceFile: TS.
     .join( ', ' );
 
   if ( params.length >= 1 ) {
-    start = params[0].getStart( sourceFile );
+    start = params[ 0 ].getStart( sourceFile );
     end = params.at( -1 )!.getEnd();  // coerce to non-null: Non‑null Assertion Operator
     return {
       asString,
@@ -731,7 +731,7 @@ function getParameterDetails( ts: typeof import( "typescript" ), sourceFile: TS.
 }
 
 
-function isThisPropertyInConstructor( ts: typeof import( "typescript" ), node: TS.Node ): boolean {
+function isThisPropertyInConstructor ( ts: typeof import( "typescript" ), node: TS.Node ): boolean {
   if ( !ts.isPropertyAccessExpression( node ) ) return false;
   if ( node.expression?.kind !== ts.SyntaxKind.ThisKeyword ) return false;
 
@@ -754,7 +754,7 @@ function isThisPropertyInConstructor( ts: typeof import( "typescript" ), node: T
  * Walks up from `node` and returns an array of all enclosing
  * function or method names, from outermost to innermost.
  */
-export function getAllEnclosingFunctionNames( ts: typeof import( "typescript" ), node: TS.Node, ): string[] {
+export function getAllEnclosingFunctionNames ( ts: typeof import( "typescript" ), node: TS.Node, ): string[] {
   const names: string[] = [];
   let cur: TS.Node | undefined = node.parent;
 
@@ -800,25 +800,25 @@ export function getAllEnclosingFunctionNames( ts: typeof import( "typescript" ),
   return names.reverse();
 }
 
-export async function buildNodeTree( items: NodePickItem[] ): Promise<NodeTreeItem[]> {
+export async function buildNodeTree ( items: NodePickItem[] ): Promise<NodeTreeItem[]> {
 
   const _Globals = Globals.default;
 
   const roots: NodeTreeItem[] = [];
   const stack: NodeTreeItem[] = [];
 
-  for ( const [index, item] of items.entries() ) {
-    const next = items[index + 1];
+  for ( const [ index, item ] of items.entries() ) {
+    const next = items[ index + 1 ];
     const hasChild = next?.depth === item.depth + 1;
 
     const treeItem = new TreeItem(
-      `${item.label} • ${item.detail}`,
+      `${ item.label } • ${ item.detail }`,
       hasChild
         ? ( _Globals.collapseTreeViewItems === "collapseOnOpen" ? TreeItemCollapsibleState.Collapsed : TreeItemCollapsibleState.Expanded )
         : TreeItemCollapsibleState.None
     );
 
-    treeItem.tooltip = `${item.kind} • ${item.detail}`;
+    treeItem.tooltip = `${ item.kind } • ${ item.detail }`;
     treeItem.description = item.name;
 
     const wrapped: NodeTreeItem = {
@@ -835,7 +835,7 @@ export async function buildNodeTree( items: NodePickItem[] ): Promise<NodeTreeIt
     if ( stack.length === 0 ) {
       roots.push( wrapped );
     } else {
-      stack[stack.length - 1].children.push( wrapped );
+      stack[ stack.length - 1 ].children.push( wrapped );
     }
 
     stack.push( wrapped );
@@ -846,7 +846,7 @@ export async function buildNodeTree( items: NodePickItem[] ): Promise<NodeTreeIt
 
 
 
-function nodeMatches( node: SymbolNode, query: string[] | string ): boolean {
+function nodeMatches ( node: SymbolNode, query: string[] | string ): boolean {
   if ( typeof query === 'string' ) {
     return node.name.toString().includes( query ) || !!node.detail?.includes( query );
   }
@@ -861,7 +861,7 @@ function nodeMatches( node: SymbolNode, query: string[] | string ): boolean {
  * Returns null if neither node nor any descendant matches.
  * Returns the parent nodes, NOT just matching child nodes.
  */
-function pruneNode( node: SymbolNode, query: string[] | string ): SymbolNode | null {
+function pruneNode ( node: SymbolNode, query: string[] | string ): SymbolNode | null {
   const matchesSelf = nodeMatches( node, query );
 
   // Recurse children and keep only those that return non-null
@@ -893,7 +893,7 @@ function pruneNode( node: SymbolNode, query: string[] | string ): SymbolNode | n
   return null;
 }
 
-export async function filterTree( query: string[] | string, items: SymbolNode[] ): Promise<SymbolNode[]> {
+export async function filterTree ( query: string[] | string, items: SymbolNode[] ): Promise<SymbolNode[]> {
 
   const out: SymbolNode[] = [];
   for ( const root of items ) {

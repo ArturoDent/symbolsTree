@@ -17,7 +17,7 @@ import { registerSymbolCache } from './sharedSymbolCache';
 let symbolView: TreeView<SymbolNode>;
 
 
-export async function activate( context: ExtensionContext ) {
+export async function activate ( context: ExtensionContext ) {
 
 	await _Globals.init( context );
 	registerSymbolCache( context );
@@ -74,7 +74,7 @@ export async function activate( context: ExtensionContext ) {
 			let kbSymbols: ( keyof SymMap )[];
 			// if triggered from Command Palette, args is undefined
 
-			if ( !!args?.symbols && !Array.isArray( args?.symbols ) ) args.symbols = [args.symbols];
+			if ( !!args?.symbols && !Array.isArray( args?.symbols ) ) args.symbols = [ args.symbols ];
 			else if ( Array.isArray( args?.symbols ) && args?.symbols?.length === 0 ) args.symbols = undefined;
 			// default is all symbols
 
@@ -231,7 +231,7 @@ export async function activate( context: ExtensionContext ) {
 				}
 
 				editor.selections = selections;
-				let node = symbolView.selection[0];
+				let node = symbolView.selection[ 0 ];
 				editor.revealRange( node.range, TextEditorRevealType.InCenter );
 				await window.showTextDocument( editor.document );
 			}
@@ -245,7 +245,7 @@ export async function activate( context: ExtensionContext ) {
 			const editor = window.activeTextEditor;
 			if ( !editor ) return;
 			const treeSelection = symbolView?.visible ? symbolView.selection : [];
-			const treeSingleSelection = treeSelection.length === 1 ? treeSelection[0] : undefined;
+			const treeSingleSelection = treeSelection.length === 1 ? treeSelection[ 0 ] : undefined;
 
 			const selectionMatchesSingleTreeNode = !!treeSingleSelection
 				&& treeSingleSelection.uri.toString() === editor.document.uri.toString()
@@ -290,7 +290,7 @@ export async function activate( context: ExtensionContext ) {
 
 			let nodeToReveal: SymbolNode | undefined = undefined;
 			if ( node ) nodeToReveal = node;
-			else nodeToReveal = treeSelection[0];
+			else nodeToReveal = treeSelection[ 0 ];
 
 			let selections: Selection[] = [];
 			let nodes: SymbolNode[] = [];
@@ -327,7 +327,7 @@ export async function activate( context: ExtensionContext ) {
 	} ) );
 }
 
-function removeEmptyStringsFromQuery( query: string | string[] ): string | string[] | undefined {
+function removeEmptyStringsFromQuery ( query: string | string[] ): string | string[] | undefined {
 
 	if ( typeof query === 'string' ) {
 		if ( !query.length ) return undefined;
@@ -338,7 +338,7 @@ function removeEmptyStringsFromQuery( query: string | string[] ): string | strin
 	}
 }
 
-export function deactivate() {}
+export function deactivate () { }
 
 
 

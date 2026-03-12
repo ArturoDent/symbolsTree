@@ -31,7 +31,7 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
   private tree: SymbolNode[] = [];
   private filterQuery: string[] | string = '';  // could enable creating a filtered TreeView from a setting
 
-  constructor( context: vscode.ExtensionContext ) {
+  constructor ( context: vscode.ExtensionContext ) {
 
 
     // create a debounced async function
@@ -73,7 +73,7 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
     } ) );
   }
 
-  public setView( view: vscode.TreeView<SymbolNode> ) {
+  public setView ( view: vscode.TreeView<SymbolNode> ) {
     this.view = view;
     // this.view.message = "message";  // shown where the symbols would be
     // this.view.title = "title";  // could be the current file
@@ -99,11 +99,11 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
   //   this._onDidChangeTreeData.fire();
   // }
 
-  public setTitle( title: string = '' ) {
+  public setTitle ( title: string = '' ) {
     if ( this.view ) this.view.title = title;
   }
 
-  public async setLock( lock = true ) {
+  public async setLock ( lock = true ) {
     if ( lock ) {
       SymbolsProvider.locked = true;
       await vscode.commands.executeCommand( 'setContext', 'symbolsTree.locked', true );
@@ -127,7 +127,7 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
   }
 
 
-  public async refresh( filterQuery: string[] | string, useCache: CacheUse = TreeCache.UseAllNodesIgnoreFilter ) {
+  public async refresh ( filterQuery: string[] | string, useCache: CacheUse = TreeCache.UseAllNodesIgnoreFilter ) {
 
     const _Globals = Globals.default;
 
@@ -200,7 +200,7 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
       // not getting .py symbols on opening vscode ExtensionHost unless 300ms
       // increase attempts or time if not js/ts/jsx/tsx ? editor.document.languageId.startsWith("javascript") or "typescript"
       // docSymbols = await getDocumentSymbolsWithRetry(uri, 6, 300) as SymbolNode[];
-      docSymbols = await getDocumentSymbolsWithRetry( uri, [1, 2, 3, 4, 5, 6], 1000 ) as SymbolNode[];
+      docSymbols = await getDocumentSymbolsWithRetry( uri, [ 1, 2, 3, 4, 5, 6 ], 1000 ) as SymbolNode[];
 
       if ( docSymbols?.length )
         treeSymbols = toSymbolNodesNodefromDocumentSymbols( docSymbols, uri );
@@ -242,8 +242,8 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
   }
 
   // use SymbolNode.children to assign SymbolNode.parent values
-  private async attachParents( roots: SymbolNode[] ): Promise<void> {
-    function walk( node: SymbolNode, parent?: SymbolNode ) {
+  private async attachParents ( roots: SymbolNode[] ): Promise<void> {
+    function walk ( node: SymbolNode, parent?: SymbolNode ) {
       node.parent = parent;
       if ( node.children && node.children.length ) {
         for ( const child of node.children ) {
@@ -258,7 +258,7 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
   }
 
   // this needs getParent(element) to work
-  public async expandAll(): Promise<void> {
+  public async expandAll (): Promise<void> {
     if ( this.view && this.tree.length ) {
 
       // this.tree.reverse() would mutate the original array, slice returns a copy of the original
@@ -276,10 +276,10 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
     }
   }
 
-  private async getSymbolAtCenterOfViewport(): Promise<SymbolNode | undefined> {
+  private async getSymbolAtCenterOfViewport (): Promise<SymbolNode | undefined> {
     const editor = vscode.window.activeTextEditor;
     if ( !editor ) return undefined;
-    const visible = editor.visibleRanges[0];
+    const visible = editor.visibleRanges[ 0 ];
     if ( !this.view || !this.tree.length || !visible ) return undefined;
 
     const middleLine = Math.floor( ( visible.start.line + visible.end.line ) / 2 );
@@ -287,7 +287,7 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
     let middleSymbol: SymbolNode | undefined;
     let minimumDistance = Number.POSITIVE_INFINITY;
 
-    function walk( symbols: SymbolNode[] ) {
+    function walk ( symbols: SymbolNode[] ) {
       for ( const s of symbols ) {
         // consider the symbol's heading/start line for "nearest" semantics
         const dist = Math.abs( s.selectionRange.start.line - middleLine );
@@ -306,12 +306,12 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
   }
 
 
-  public async expandMiddleSymbol(): Promise<void> {
+  public async expandMiddleSymbol (): Promise<void> {
 
     if ( this.view && this.tree.length ) {
 
       let middleSymbol = await this.getSymbolAtCenterOfViewport();
-      let middleSymbolOuterParent = this.tree[0];
+      let middleSymbolOuterParent = this.tree[ 0 ];
 
       if ( middleSymbol ) {
         for ( const topNode of this.tree ) {
@@ -325,11 +325,11 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
   }
 
 
-  getParent( element: SymbolNode ): SymbolNode | null {
+  getParent ( element: SymbolNode ): SymbolNode | null {
     return element.parent ?? null;
   }
 
-  getTreeItem( element: SymbolNode ): vscode.TreeItem {
+  getTreeItem ( element: SymbolNode ): vscode.TreeItem {
 
     // this._Globals.collapseTreeViewItems === "collapseOnOpen"/"expandOnOpen"
     const _Globals = Globals.default;
@@ -345,14 +345,14 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
     item.command = {
       command: 'symbolsTree.revealSymbol',
       title: 'Reveal Symbol',
-      arguments: [element]
+      arguments: [ element ]
     };
     item.contextValue = 'symbolNode';
-    item.tooltip = `${element.name} — ${vscode.SymbolKind[element?.kind]}`;
+    item.tooltip = `${ element.name } — ${ vscode.SymbolKind[ element?.kind ] }`;
     return item;
   }
 
-  getChildren( element?: SymbolNode ): Thenable<SymbolNode[]> {
+  getChildren ( element?: SymbolNode ): Thenable<SymbolNode[]> {
     if ( !element ) {
       return Promise.resolve( this.tree );
     }
@@ -360,7 +360,7 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
   };
 
 
-  public static kindToName( kind: vscode.SymbolKind ): string {
+  public static kindToName ( kind: vscode.SymbolKind ): string {
     switch ( kind ) {
       case vscode.SymbolKind.File: return 'file';
       case vscode.SymbolKind.Module: return 'module';
@@ -392,7 +392,7 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
     }
   }
 
-  public static kindToIcon( kind: vscode.SymbolKind ): string {
+  public static kindToIcon ( kind: vscode.SymbolKind ): string {
     switch ( kind ) {
       case vscode.SymbolKind.File: return 'symbol-file';
       case vscode.SymbolKind.Module: return 'symbol-module';
@@ -424,7 +424,7 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
     }
   }
 
-  public static nameToKind( name: string ): vscode.SymbolKind {
+  public static nameToKind ( name: string ): vscode.SymbolKind {
     switch ( name ) {
       case 'file': return vscode.SymbolKind.File;
       case 'module': return vscode.SymbolKind.Module;
@@ -456,14 +456,14 @@ export class SymbolsProvider implements vscode.TreeDataProvider<SymbolNode> {
     }
   }
 
-  dispose() {
+  dispose () {
     for ( const d of this.disposables ) d.dispose();
     this.debouncedRefresh.cancel?.();
   }
 }
 
 // async function getDocumentSymbolsWithRetry(uri: vscode.Uri, attempts = 6, delayMs = 200): Promise<vscode.DocumentSymbol[] | undefined> {
-async function getDocumentSymbolsWithRetry( uri: vscode.Uri, attempts = [1, 2, 3, 4, 5, 6], delayMs = 200 ): Promise<SymbolNode[] | undefined> {
+async function getDocumentSymbolsWithRetry ( uri: vscode.Uri, attempts = [ 1, 2, 3, 4, 5, 6 ], delayMs = 200 ): Promise<SymbolNode[] | undefined> {
 
   for await ( const attempt of attempts ) {
 

@@ -54,7 +54,7 @@ export class SymbolPicker {
   public tracker;
 
 
-  constructor( context: ExtensionContext ) {
+  constructor ( context: ExtensionContext ) {
 
     this.qp = window.createQuickPick<SymbolPickItem>();
     this.qp.ignoreFocusOut = true;
@@ -77,7 +77,7 @@ export class SymbolPicker {
       tooltip: 'Select Symbol'
     };
 
-    if ( !this.qp.buttons.length ) this.qp.buttons = [this.filterButton, this.refreshButton];
+    if ( !this.qp.buttons.length ) this.qp.buttons = [ this.filterButton, this.refreshButton ];
 
 
     context.subscriptions.push( workspace.onDidChangeConfiguration( e => {
@@ -109,8 +109,8 @@ export class SymbolPicker {
         end: new Position( target.range.end.line, lastLineLength )
       } );
 
-      editor.selections = [new Selection( extendedRange.end, extendedRange.start )];
-      editor.revealRange( new Range( editor.selections[0].anchor, editor.selections[0].active ), TextEditorRevealType.Default );
+      editor.selections = [ new Selection( extendedRange.end, extendedRange.start ) ];
+      editor.revealRange( new Range( editor.selections[ 0 ].anchor, editor.selections[ 0 ].active ), TextEditorRevealType.Default );
       this.qp.hide();
     } ) );
 
@@ -120,9 +120,9 @@ export class SymbolPicker {
       const document = editor?.document;
       if ( !document ) return;
 
-      const target = selectedItems[0].selectionRange;
-      editor.selections = [new Selection( target.start, target.start )];
-      editor.revealRange( new Range( editor.selections[0].active, editor.selections[0].active ), TextEditorRevealType.InCenter );
+      const target = selectedItems[ 0 ].selectionRange;
+      editor.selections = [ new Selection( target.start, target.start ) ];
+      editor.revealRange( new Range( editor.selections[ 0 ].active, editor.selections[ 0 ].active ), TextEditorRevealType.InCenter );
       this.qp.hide();
     } ) );
 
@@ -197,7 +197,7 @@ export class SymbolPicker {
 
 
   // Get the Nodes using tsc, and return filtered nodes
-  async getNodes( kbSymbols: ( keyof SymMap )[], document: TextDocument ): Promise<ReturnSymbols | undefined> {
+  async getNodes ( kbSymbols: ( keyof SymMap )[], document: TextDocument ): Promise<ReturnSymbols | undefined> {
 
     this.kbSymbolsSaved = kbSymbols;
     let thisUriCache: QuickPickCache | undefined;
@@ -241,7 +241,7 @@ export class SymbolPicker {
  * 3. Build a depth map of all symbols.
  * 4. Filter the depth map by keybinding symbols.
   */
-  async getSymbols( kbSymbols: ( keyof SymMap )[], document: TextDocument ): Promise<ReturnSymbols | undefined> {
+  async getSymbols ( kbSymbols: ( keyof SymMap )[], document: TextDocument ): Promise<ReturnSymbols | undefined> {
 
     this.kbSymbolsSaved = kbSymbols;
     const _Globals = Globals.default;
@@ -313,12 +313,12 @@ export class SymbolPicker {
   /**
    * Show a QuickPick of the document symbols in options 'symbols'
   */
-  async render( symbols: ReturnSymbols, renderFilteredSymbols: boolean ) {
+  async render ( symbols: ReturnSymbols, renderFilteredSymbols: boolean ) {
     const document = window.activeTextEditor?.document;
     if ( !document ) return;
 
-    const filteredQPItems = await this.makeQPItems( symbols.filteredSymbols, [this.selectButton] );
-    const allQPItems = await this.makeQPItems( symbols.allSymbols, [this.selectButton] );
+    const filteredQPItems = await this.makeQPItems( symbols.filteredSymbols, [ this.selectButton ] );
+    const allQPItems = await this.makeQPItems( symbols.allSymbols, [ this.selectButton ] );
 
     if ( renderFilteredSymbols ) {
       this.qp.items = filteredQPItems;
@@ -337,20 +337,20 @@ export class SymbolPicker {
   }
 
 
-  async makeQPItems( items: NodePickItems | SymbolMap, buttons: QuickInputButton[] ): Promise<SymbolPickItem[]> {
+  async makeQPItems ( items: NodePickItems | SymbolMap, buttons: QuickInputButton[] ): Promise<SymbolPickItem[]> {
 
     const qpItems: SymbolPickItem[] = [];
 
     if ( isMap( items ) ) {    // for SymbolMap, non-tsc
 
       items.forEach( ( depth, symbol ) => {
-        let label = ( parseInt( symbol.name ) >= 0 ) ? symbol.detail : `${symbol.name}: ${symbol.detail}`;
+        let label = ( parseInt( symbol.name ) >= 0 ) ? symbol.detail : `${ symbol.name }: ${ symbol.detail }`;
         if ( depth ) label = ( '└─  ' + label ).padStart( label.length + ( depth * 10 ), ' ' );
 
         // do a reverse mapping from symbol.kind -> "class", "function", etc.
         // description: ` (${mapKindToNameAndIconPath.get(symbol.kind)?.name})`, // var => arrow fn
         qpItems.push( {
-          label: label + ` --- (${mapKindToNameAndIconPath.get( symbol?.kind )?.name})`,
+          label: label + ` --- (${ mapKindToNameAndIconPath.get( symbol?.kind )?.name })`,
           range: symbol.range,
           selectionRange: symbol.selectionRange,
           buttons
@@ -365,7 +365,7 @@ export class SymbolPicker {
         if ( item.depth > 0 ) label = ( '└─  ' + label ).padStart( item.label!.length + ( item.depth * 10 ), ' ' );
 
         qpItems.push( {
-          label: `${label}   ---  (${item.detail})`,
+          label: `${ label }   ---  (${ item.detail })`,
           range: item.range,
           selectionRange: item.selectionRange,
           buttons
@@ -376,7 +376,7 @@ export class SymbolPicker {
     return qpItems;
   }
 
-  dispose() {
+  dispose () {
     // this.context.subscriptions.forEach(sub => sub.dispose());
     // this.qp.dispose();
     // this.dispose();
@@ -385,7 +385,7 @@ export class SymbolPicker {
 }
 
 // Usage: this.tracker.visible
-export function trackQuickPickVisibility( qp: QuickPick<any> ) {
+export function trackQuickPickVisibility ( qp: QuickPick<any> ) {
   let visible = false;
 
   // TODO: setContext in these fo ruse in keybindings
@@ -405,7 +405,7 @@ export function trackQuickPickVisibility( qp: QuickPick<any> ) {
 
   // Expose a property-style getter
   return {
-    get visible() {
+    get visible () {
       return visible;
     }
   };
