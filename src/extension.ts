@@ -12,6 +12,7 @@ const _Globals = Globals.default;
 
 import type { SymMap, SymbolNode, ReturnSymbols } from './types';
 import { TreeCache } from './types';
+import { registerSymbolCache } from './sharedSymbolCache';
 
 let symbolView: TreeView<SymbolNode>;
 
@@ -19,6 +20,7 @@ let symbolView: TreeView<SymbolNode>;
 export async function activate( context: ExtensionContext ) {
 
 	await _Globals.init( context );
+	registerSymbolCache( context );
 	let treeSymbolProvider: SymbolsProvider;
 
 	if ( _Globals.makeTreeView ) {
@@ -46,12 +48,12 @@ export async function activate( context: ExtensionContext ) {
 
 	context.subscriptions.push(    // register QuickPick commands
 
-		commands.registerCommand( 'symbolsTree.refreshQuickPick', async ( args ) => {
+		commands.registerCommand( 'symbolsTree.refreshQuickPick', async ( args: any ) => {
 			if ( qpTracker.visible )
 				await commands.executeCommand( "symbolsTree.showQuickPick" );
 		} ),
 
-		commands.registerCommand( 'symbolsTree.showQuickPick', async ( args ) => {
+		commands.registerCommand( 'symbolsTree.showQuickPick', async ( args: any ) => {
 
 			if ( qpTracker.visible ) return;  // noop if alreadu open
 
@@ -98,7 +100,7 @@ export async function activate( context: ExtensionContext ) {
 
 	context.subscriptions.push(    // register Tree View commands
 		// from keybinding only
-		commands.registerCommand( 'symbolsTree.applyFilter', async ( args ) => {
+		commands.registerCommand( 'symbolsTree.applyFilter', async ( args: any ) => {
 
 			if ( !window.activeTextEditor ) {
 				showSimpleMessage( "There is no text editor open." );
@@ -337,4 +339,6 @@ function removeEmptyStringsFromQuery( query: string | string[] ): string | strin
 }
 
 export function deactivate() {}
+
+
 
