@@ -110,7 +110,7 @@ export class SymbolPicker {
       } );
 
       editor.selections = [ new Selection( extendedRange.end, extendedRange.start ) ];
-      editor.revealRange( new Range( editor.selections[ 0 ].anchor, editor.selections[ 0 ].active ), TextEditorRevealType.Default );
+      editor.revealRange( new Range( editor.selections[ 0 ].anchor, editor.selections[ 0 ].active ), TextEditorRevealType.InCenterIfOutsideViewport );
       this.qp.hide();
     } ) );
 
@@ -122,7 +122,7 @@ export class SymbolPicker {
 
       const target = selectedItems[ 0 ].selectionRange;
       editor.selections = [ new Selection( target.start, target.start ) ];
-      editor.revealRange( new Range( editor.selections[ 0 ].active, editor.selections[ 0 ].active ), TextEditorRevealType.InCenter );
+      editor.revealRange( new Range( editor.selections[ 0 ].active, editor.selections[ 0 ].active ), TextEditorRevealType.InCenterIfOutsideViewport );
       this.qp.hide();
     } ) );
 

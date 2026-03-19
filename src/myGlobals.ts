@@ -53,6 +53,7 @@ export default class _Globals {
     else this.isJSTS = false;
   }
 
+
   // ---- private generic accessors used only inside this class ----
   private static get<T> ( key: string, defaultValue?: T ): T | undefined {
     const config = workspace.getConfiguration( this.section );

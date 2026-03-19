@@ -243,8 +243,8 @@ This is a toggle between collapse all  and expand all - there will only be a sin
 This command is triggered in one of three ways:  
 
 1.  by clicking on the **selection** icon ( <img src="./icons/selection.jpg" width="16" height="16" alt="selection icon"/> ) found on each line of the TreeView when hovering over an entry;
-2.  by clickig on the **selection** icon on each line of the QuickPick you opened; or  
-3.  by triggering the command ffrom the Command Palette or a keybinding such as  
+2.  by clicking on the **selection** icon on each line of the QuickPick you opened; or  
+3.  by triggering the command from the Command Palette or a keybinding such as  
 
 ```jsonc
 {
@@ -253,7 +253,7 @@ This command is triggered in one of three ways:
 }
   ```
   
-When you have symbols which have parent symbols you can quickly select up yhe parent tree by repeatedly triggering the keybinding as the following demo shows:  
+When you have symbols which have parent symbols you can quickly select up the parent tree by repeatedly triggering the keybinding as the following demo shows:  
 
 <img src="https://github.com/ArturoDent/symbolsTree/blob/main/images/parentSelection.gif?raw=true" width="750" height="400" alt="Progressively select parent symbols"/>
 
@@ -264,6 +264,26 @@ Parent selection also works when starting in the TreeView.  First click on the s
  As the following demo shows you can also select more than one entry and then click the selection icon to go to and select all those symbols - with multiple cursors being created.  In the demo I use <kbd>Alt</kbd>+<kbd>click</kbd> to select multiple symbols in the TreeView list.  You can also use <kbd>Shift</kbd>+<kbd>click</kbd> to select a range of symbols - each symbol will be selected with its own cursor.  
 
 <img src="https://github.com/ArturoDent/symbolsTree/blob/main/images/TreeViewMultipleSelections1.gif?raw=true" width="950" height="500" alt="Multiple selections in the TreeView"/>
+
+---------------
+
+**symbolsTree.revealSymbol**  
+ In the Command Palette: ``` Symbols Tree: Go to selected symbol(s)  ```
+
+ This works very much like `symbolsTree.SelectSymbol`.  It can be triggered from an editor or when the `symbolsTree` is focussed.  Here is the default keybinding:
+
+ ```jsonc
+{
+  "key": "alt+t",
+  "command": "symbolsTree.selectSymbol"
+}
+  ```
+  
+If you are focussed in an editor and you trigger this command the current symbol will be "revealed" - this means the cursor will move to the beginning of the symbol.  If the cursor is already at the beginng of the current symbol, then the cursor will move to the beginning of the parnet symbol (if any).  In this way you can quickly move from children symbols up through their parent symbol tree.
+
+If the `symbolsTree` is visible, triggering the command when the editor is focussed will reveal the symbol in the `symbolsTree` view.  And as you move up the parent tree, those parents will be revealed - this means highlighted but not selected.
+
+If you are focussed on the tree view and you either trigger the command with its keybinding or click on that symbol in the tree view, its parent (if any) will be "revealed".  
 
 ---------------
 
@@ -338,13 +358,11 @@ These are the default keybindings that are set by the extension, but they can be
 },
 {
   "key": "alt+t",
-  "command": "symbolsTree.revealSymbol",
-  "when": "symbolsTree.visible && symbolsTree.hasSelection"
+  "command": "symbolsTree.revealSymbol"
 },
 {
   "key": "alt+s",
-  "command": "symbolsTree.selectSymbol",
-  "when": "symbolsTree.visible && symbolsTree.hasSelection"
+  "command": "symbolsTree.selectSymbol"
 }
 ```
 

@@ -119,7 +119,7 @@
         },
         {
           "command": "symbolsTree.revealSymbol",
-          "when": "symbolsTree.visible && symbolsTree.hasSelection"
+          "when": "symbolsTree.visible"
         },
         {
           "command": "symbolsTree.refreshTree",
@@ -316,13 +316,11 @@
       },
       {
         "key": "alt+t",
-        "command": "symbolsTree.revealSymbol",
-        "when": "symbolsTree.visible && symbolsTree.hasSelection"
+        "command": "symbolsTree.revealSymbol"
       },
       {
         "key": "alt+s",
-        "command": "symbolsTree.selectSymbol",
-        "when": "symbolsTree.visible && symbolsTree.hasSelection"
+        "command": "symbolsTree.selectSymbol"
       }
     ]
   },

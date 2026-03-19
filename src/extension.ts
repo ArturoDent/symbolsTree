@@ -5,7 +5,15 @@ import {
 import { SymbolsProvider } from './tree';
 import { SymbolPicker, trackQuickPickVisibility } from './quickPick';
 import { showSimpleMessage } from './messages';
-import { getNextSymbolTarget, getNextSymbolTargetFromSymbol, makeSelectionFromSymbol, resetSelectionCycle } from './symbolLocation';
+import {
+	getNextRevealTarget,
+	getNextRevealTargetFromSymbol,
+	getNextSymbolTarget,
+	getNextSymbolTargetFromSymbol,
+	makeRevealSelectionFromSymbol,
+	makeSelectionFromSymbol,
+	resetSelectionCycle
+} from './symbolLocation';
 import * as Globals from './myGlobals';
 
 const _Globals = Globals.default;
@@ -99,6 +107,7 @@ export async function activate ( context: ExtensionContext ) {
 
 
 	context.subscriptions.push(    // register Tree View commands
+
 		// from keybinding only
 		commands.registerCommand( 'symbolsTree.applyFilter', async ( args: any ) => {
 
@@ -208,33 +217,84 @@ export async function activate ( context: ExtensionContext ) {
 
 		commands.registerCommand( 'symbolsTree.revealSymbol', async ( node: SymbolNode ) => {
 
-			if ( !node && !symbolView.selection.length ) {
+			const editor = window.activeTextEditor;
+			if ( !editor ) return;
+
+			const treeSelection = symbolView?.visible ? symbolView.selection : [];
+			const treeSingleSelection = treeSelection.length === 1 ? treeSelection[ 0 ] : undefined;
+
+			const selectionMatchesSingleTreeNode = !!treeSingleSelection
+				&& treeSingleSelection.uri.toString() === editor.document.uri.toString()
+				&& ( () => {
+					const treeNodeSelection = makeRevealSelectionFromSymbol( editor, treeSingleSelection );
+					return editor.selection.anchor.isEqual( treeNodeSelection.anchor )
+						&& editor.selection.active.isEqual( treeNodeSelection.active );
+				} )();
+
+			const singleTreeNode = node || ( selectionMatchesSingleTreeNode ? treeSingleSelection : undefined );
+			const shouldUseTreeSelection = !!node || treeSelection.length > 1 || !!singleTreeNode;
+
+			if ( singleTreeNode && singleTreeNode.uri.toString() === editor.document.uri.toString() ) {
+				const target = getNextRevealTargetFromSymbol( editor, singleTreeNode );
+				if ( target ) {
+					editor.selection = target.selection;
+					editor.revealRange( target.symbol.range, TextEditorRevealType.InCenterIfOutsideViewport );
+					if ( symbolView?.visible ) {
+						await symbolView.reveal( target.symbol, { expand: undefined, focus: false, select: true } );
+					}
+					await window.showTextDocument( editor.document );
+					return;
+				}
+			}
+
+			if ( !shouldUseTreeSelection ) {
+				const target = await getNextRevealTarget( editor );
+
+				if ( !target ) {
+					showSimpleMessage( "Found no symbol at the current cursor position." );
+					return;
+				}
+
+				editor.selection = target.selection;
+				editor.revealRange( target.symbol.range, TextEditorRevealType.InCenterIfOutsideViewport );
+				if ( symbolView?.visible ) {
+					await symbolView.reveal( target.symbol, { expand: undefined, focus: false, select: true } );
+				}
+				await window.showTextDocument( editor.document );
+				return;
+			}
+
+			if ( !node && !treeSelection.length ) {
 				showSimpleMessage( "There are no symbols selected in the Tree View to reveal." );
 				return;
 			}
 
-			const editor = window.activeTextEditor;
-			if ( !editor ) return;
+			resetSelectionCycle();
 
-			// if a node, reveal that
-			// if !node, get symbolView.selection, reveal first
+			let nodeToReveal: SymbolNode | undefined = undefined;
+			if ( node ) nodeToReveal = node;
+			else nodeToReveal = treeSelection[ 0 ];
+
+			let selections: Selection[] = [];
+			let nodes: SymbolNode[] = [];
+
 			if ( node ) {
-				editor.revealRange( node.range, TextEditorRevealType.InCenter );
-				editor.selection = new Selection( node.selectionRange.start, node.selectionRange.start );
-				await window.showTextDocument( editor.document );
+				if ( treeSelection.includes( node ) ) nodes.push( ...treeSelection );
+				else nodes.push( node );
 			}
-			else if ( symbolView.selection.length ) {   // !node, triggered by keybinding
-				let selections = [];
+			else nodes.push( ...treeSelection );
 
-				for ( const node of symbolView.selection ) {
-					selections.push( new Selection( node.selectionRange.start, node.selectionRange.start ) );
-				}
-
-				editor.selections = selections;
-				let node = symbolView.selection[ 0 ];
-				editor.revealRange( node.range, TextEditorRevealType.InCenter );
-				await window.showTextDocument( editor.document );
+			for ( const node of nodes ) {
+				selections.push( makeRevealSelectionFromSymbol( editor, node ) );
 			}
+
+			editor.selections = selections;
+			editor.revealRange( nodeToReveal.range, TextEditorRevealType.InCenterIfOutsideViewport );
+
+			if ( symbolView?.visible && nodeToReveal ) {
+				await symbolView.reveal( nodeToReveal, { expand: undefined, focus: false, select: true } );
+			}
+			await window.showTextDocument( editor.document );
 			// if need the activeItem(s), see proposed: https://github.com/EhabY/vscode/blob/d23158246aaa474996f2237f735461ad47e41403/src/vscode-dts/vscode.proposed.treeViewActiveItem.d.ts#L10-L29
 			// treeView.onDidChangeActiveItem()
 			// waiting on https://github.com/microsoft/vscode/issues/185563
@@ -263,7 +323,7 @@ export async function activate ( context: ExtensionContext ) {
 				if ( target ) {
 					editor.selection = target.selection;
 					editor.revealRange( target.symbol.range, TextEditorRevealType.InCenterIfOutsideViewport );
-					if ( symbolView ) {
+					if ( symbolView?.visible ) {
 						await symbolView.reveal( target.symbol, { expand: undefined, focus: false, select: true } );
 					}
 					await window.showTextDocument( editor.document );
@@ -310,7 +370,7 @@ export async function activate ( context: ExtensionContext ) {
 			const revealRange = new Range( nodeToReveal.range.start, nodeToReveal.range.end );
 			editor.revealRange( revealRange, TextEditorRevealType.InCenterIfOutsideViewport );
 
-			if ( symbolView && nodeToReveal ) {
+			if ( symbolView?.visible && nodeToReveal ) {
 				await symbolView.reveal( nodeToReveal, { expand: undefined, focus: false, select: true } );
 			}
 			await window.showTextDocument( editor.document );
@@ -339,6 +399,3 @@ function removeEmptyStringsFromQuery ( query: string | string[] ): string | stri
 }
 
 export function deactivate () { }
-
-
-

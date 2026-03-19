@@ -187,11 +187,13 @@ async function getCachedSymbolsForEditor ( editor: vscode.TextEditor ): Promise<
   const source: SymbolSource = ( _Globals.isJSTS && _Globals.useTypescriptCompiler ) ? 'tsc' : 'vscode';
   const uri = editor.document.uri;
 
+  // if cached
   const hit = cache.get( uri );
   if ( hit && !hit.refreshSymbols && hit.documentVersion === editor.document.version && hit.source === source ) {
     return hit.allSymbols;
   }
 
+  // else no cache yet
   const symbols = await buildSymbolsForDocument( editor.document, source );
   cache.set( uri, {
     documentVersion: editor.document.version,
@@ -236,9 +238,10 @@ function getChainFromLeaf ( leaf: SymbolNode ): SymbolNode[] {
   return chain.reverse();
 }
 
-function getNextSymbolTargetFromChain (
+function getNextTargetFromChain (
   editor: vscode.TextEditor,
-  chain: SymbolNode[]
+  chain: SymbolNode[],
+  getSelectionFromSymbol: ( editor: vscode.TextEditor, symbol: SymbolNode ) => vscode.Selection
 ): { symbol: SymbolNode; selection: vscode.Selection; } | undefined {
 
   const uri = editor.document.uri.toString();
@@ -251,7 +254,7 @@ function getNextSymbolTargetFromChain (
 
     cycleState.currentIndex = Math.max( 0, cycleState.currentIndex - 1 );
     const symbol = cycleState.chain[ cycleState.currentIndex ];
-    const selection = makeSelectionFromSymbol( editor, symbol );
+    const selection = getSelectionFromSymbol( editor, symbol );
     cycleState.selection = selection;
 
     return { symbol, selection };
@@ -264,7 +267,7 @@ function getNextSymbolTargetFromChain (
 
   const currentIndex = chain.length - 1;
   const symbol = chain[ currentIndex ];
-  const selection = makeSelectionFromSymbol( editor, symbol );
+  const selection = getSelectionFromSymbol( editor, symbol );
 
   cycleState = {
     uri,
@@ -291,6 +294,10 @@ export function makeSelectionFromSymbol ( editor: vscode.TextEditor, symbol: Sym
   } );
 
   return new vscode.Selection( extendedRange.start, extendedRange.end );
+}
+
+export function makeRevealSelectionFromSymbol ( _editor: vscode.TextEditor, symbol: SymbolNode ): vscode.Selection {
+  return new vscode.Selection( symbol.selectionRange.start, symbol.selectionRange.start );
 }
 
 export function resetSelectionCycle (): void {
@@ -328,7 +335,7 @@ export function getNextSymbolTargetFromSymbol (
     };
   }
 
-  return getNextSymbolTargetFromChain( editor, chain );
+  return getNextTargetFromChain( editor, chain, makeSelectionFromSymbol );
 }
 
 export async function getNextSymbolTarget ( editor: vscode.TextEditor ): Promise<{ symbol: SymbolNode; selection: vscode.Selection; } | undefined> {
@@ -340,7 +347,52 @@ export async function getNextSymbolTarget ( editor: vscode.TextEditor ): Promise
   }
 
   const chain = getSymbolChainAtPosition( symbols, editor.selection.active );
-  return getNextSymbolTargetFromChain( editor, chain || [] );
+  return getNextTargetFromChain( editor, chain || [], makeSelectionFromSymbol );
+}
+
+export function getNextRevealTargetFromSymbol (
+  editor: vscode.TextEditor,
+  symbol: SymbolNode
+): { symbol: SymbolNode; selection: vscode.Selection; } | undefined {
+
+  const chain = getChainFromLeaf( symbol );
+  if ( !chain.length ) {
+    cycleState = undefined;
+    return undefined;
+  }
+
+  const symbolSelection = makeRevealSelectionFromSymbol( editor, symbol );
+
+  if ( !selectionEquals( editor.selection, symbolSelection ) ) {
+    const currentIndex = chain.length - 1;
+    cycleState = {
+      uri: editor.document.uri.toString(),
+      documentVersion: editor.document.version,
+      chainKey: makeChainKey( chain ),
+      chain,
+      currentIndex,
+      selection: symbolSelection
+    };
+
+    return {
+      symbol: chain[ currentIndex ],
+      selection: symbolSelection
+    };
+  }
+
+  return getNextTargetFromChain( editor, chain, makeRevealSelectionFromSymbol );
+}
+
+export async function getNextRevealTarget ( editor: vscode.TextEditor ): Promise<{ symbol: SymbolNode; selection: vscode.Selection; } | undefined> {
+
+  const symbols = await getCachedSymbolsForEditor( editor );
+  if ( !symbols.length ) {
+    cycleState = undefined;
+    return undefined;
+  }
+
+  const chain = getSymbolChainAtPosition( symbols, editor.selection.active );
+  return getNextTargetFromChain( editor, chain || [], makeRevealSelectionFromSymbol );
 }
 
 
